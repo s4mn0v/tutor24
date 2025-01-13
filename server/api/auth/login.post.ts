@@ -1,28 +1,58 @@
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+// server/api/auth/login.post.ts
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { defineEventHandler, readBody, createError } from 'h3'; // Assuming h3 is used for event handling
 
 const prisma = new PrismaClient();
-const secretKey = process.env.JWT_SECRET || 'secret'; // Usa una clave secreta más segura
+
+interface LoginRequest {
+  email: string;
+  password: string;
+}
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event);
-  const { correo, contrasena } = body;
+  const body: LoginRequest = await readBody(event);
+  const { email, password } = body;
 
-  // Busca el usuario
-  const user = await prisma.usuario.findUnique({ where: { correo } });
-  if (!user) {
-    throw createError({ statusCode: 401, message: 'Correo o contraseña incorrectos' });
+  try {
+    const user = await prisma.usuario.findUnique({
+      where: { correo: email },
+      select: {
+        id: true,
+        contrasena: true,
+        rol: true,
+      },
+    });
+
+    if (!user) {
+      return createError({
+        statusCode: 401,
+        message: "Invalid credentials",
+      });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.contrasena);
+
+    if (!isPasswordValid) {
+      return createError({
+        statusCode: 401,
+        message: "Invalid credentials",
+      });
+    }
+
+    const token = jwt.sign(
+      { userId: user.id, role: user.rol },
+      process.env.JWT_SECRET || "fallback_secret",
+      { expiresIn: "1h" }
+    );
+
+    return { token, role: user.rol };
+  } catch (error) {
+    console.error("Login error:", error);
+    return createError({
+      statusCode: 500,
+      message: "Internal server error",
+    });
   }
-
-  // Verifica la contraseña
-  const validPassword = await bcrypt.compare(contrasena, user.contrasena);
-  if (!validPassword) {
-    throw createError({ statusCode: 401, message: 'Correo o contraseña incorrectos' });
-  }
-
-  // Genera el token JWT
-  const token = jwt.sign({ id: user.id, rol: user.rol }, secretKey, { expiresIn: '1h' });
-
-  return { message: 'Login exitoso', token, rol: user.rol };
 });

@@ -10,4 +10,9 @@ export default ({
       autoprefixer: {},
     },
   },
+  runtimeConfig: {
+    public: {
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api'
+    }
+  },
 });

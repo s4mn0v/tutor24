@@ -1,30 +1,39 @@
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import { PrismaClient, Rol } from "@prisma/client"; // Import Rol enum
+import bcrypt from "bcrypt";
+
 const prisma = new PrismaClient();
 
+interface RegisterBody {
+  email: string;
+  password: string;
+  role: Rol; // Change type from string to Rol
+  documentoIdentidad?: string; // Optional field
+  nombre?: string; // Optional field
+}
+
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event);
-  const { documentoIdentidad, nombre, rol, correo, contrasena } = body;
+  const body: RegisterBody = await readBody(event);
+  const { email, password, role, documentoIdentidad = "temp", nombre = "Temporary Name" } = body;
 
-  // Verifica si el usuario ya existe
-  const existingUser = await prisma.usuario.findUnique({ where: { correo } });
-  if (existingUser) {
-    throw createError({ statusCode: 400, message: 'Usuario ya registrado' });
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await prisma.usuario.create({
+      data: {
+        correo: email,
+        contrasena: hashedPassword,
+        rol: role,
+        documentoIdentidad,
+        nombre,
+      },
+    });
+
+    return { message: "User registered successfully", userId: user.id };
+  } catch (error) {
+    console.error("Registration error:", error);
+    return createError({
+      statusCode: 500,
+      message: "Internal server error",
+    });
   }
-
-  // Hashea la contraseña
-  const hashedPassword = await bcrypt.hash(contrasena, 10);
-
-  // Crea el nuevo usuario
-  const newUser = await prisma.usuario.create({
-    data: {
-      documentoIdentidad,
-      nombre,
-      rol,
-      correo,
-      contrasena: hashedPassword,
-    },
-  });
-
-  return { message: 'Usuario registrado exitosamente', userId: newUser.id };
 });
