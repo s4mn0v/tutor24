@@ -6,14 +6,15 @@ const prisma = new PrismaClient();
 interface RegisterBody {
   email: string;
   password: string;
-  role: Rol; // Change type from string to Rol
+  role: Rol;
   documentoIdentidad?: string; // Optional field
   nombre?: string; // Optional field
+  telefono?: string; // Optional field
 }
 
 export default defineEventHandler(async (event) => {
   const body: RegisterBody = await readBody(event);
-  const { email, password, role, documentoIdentidad = "temp", nombre = "Temporary Name" } = body;
+  const { email, password, role, documentoIdentidad = "temp", nombre = "Temporary Name", telefono = "" } = body;
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -25,6 +26,7 @@ export default defineEventHandler(async (event) => {
         rol: role,
         documentoIdentidad,
         nombre,
+        telefono,  // Asegúrate de guardar el teléfono en la base de datos
       },
     });
 

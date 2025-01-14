@@ -13,23 +13,45 @@
               class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
               placeholder="Email address" v-model="email" />
           </div>
+
+          <div v-if="isRegistering">
+            <label for="documentoIdentidad" class="sr-only">Documento de Identidad</label>
+            <input id="documentoIdentidad" name="documentoIdentidad" type="text" required
+              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              placeholder="Documento de Identidad" v-model="documentoIdentidad" />
+          </div>
+
+          <div v-if="isRegistering">
+            <label for="nombre" class="sr-only">Nombre</label>
+            <input id="nombre" name="nombre" type="text" required
+              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              placeholder="Nombre" v-model="nombre" />
+          </div>
+
+          <div v-if="isRegistering">
+            <label for="telefono" class="sr-only">Teléfono</label>
+            <input id="telefono" name="telefono" type="tel" required
+              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              placeholder="Teléfono" v-model="telefono" />
+          </div>
+
+          <div v-if="isRegistering">
+            <label for="role" class="block text-sm font-medium text-gray-700">Role</label>
+            <select id="role" name="role"
+              class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+              v-model="role">
+              <option value="ADMIN">Admin</option>
+              <option value="DOCENTE">Teacher</option>
+              <option value="ESTUDIANTE">Student</option>
+            </select>
+          </div>
+
           <div>
             <label for="password" class="sr-only">Password</label>
             <input id="password" name="password" type="password" autocomplete="current-password" required
               class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
               placeholder="Password" v-model="password" />
           </div>
-        </div>
-
-        <div v-if="isRegistering">
-          <label for="role" class="block text-sm font-medium text-gray-700">Role</label>
-          <select id="role" name="role"
-            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-            v-model="role">
-            <option value="ADMIN">Admin</option>
-            <option value="DOCENTE">Teacher</option>
-            <option value="ESTUDIANTE">Student</option>
-          </select>
         </div>
 
         <div v-if="error" class="text-red-500 text-sm text-center">
@@ -64,6 +86,9 @@ const { login, register, isAuthenticated } = useAuth()
 const email = ref('')
 const password = ref('')
 const role = ref('ESTUDIANTE')
+const documentoIdentidad = ref('')
+const nombre = ref('')
+const telefono = ref('')
 
 // Set initial state based on query parameter
 const isRegistering = ref(route.query.register === 'true')
@@ -81,7 +106,7 @@ const handleSubmit = async () => {
   error.value = ''
   try {
     if (isRegistering.value) {
-      await register(email.value, password.value, role.value)
+      await register(email.value, password.value, role.value, documentoIdentidad.value, nombre.value, telefono.value)
       // After successful registration, switch to login
       isRegistering.value = false
       error.value = 'Registration successful! Please login.'
