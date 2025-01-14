@@ -1,4 +1,4 @@
-import { PrismaClient, Rol } from "@prisma/client"; // Import Rol enum
+import { PrismaClient, Rol } from "@prisma/client";
 import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
@@ -7,14 +7,21 @@ interface RegisterBody {
   email: string;
   password: string;
   role: Rol;
-  documentoIdentidad?: string; // Optional field
-  nombre?: string; // Optional field
-  telefono?: string; // Optional field
+  documentoIdentidad?: string;
+  nombre?: string;
+  telefono?: string;
 }
 
 export default defineEventHandler(async (event) => {
   const body: RegisterBody = await readBody(event);
-  const { email, password, role, documentoIdentidad = "temp", nombre = "Temporary Name", telefono = "" } = body;
+  const {
+    email,
+    password,
+    role,
+    documentoIdentidad = "temp",
+    nombre = "Temporary Name",
+    telefono = "",
+  } = body;
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -26,16 +33,27 @@ export default defineEventHandler(async (event) => {
         rol: role,
         documentoIdentidad,
         nombre,
-        telefono,  // Asegúrate de guardar el teléfono en la base de datos
+        telefono,
       },
     });
 
     return { message: "User registered successfully", userId: user.id };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Registration error:", error);
-    return createError({
-      statusCode: 500,
-      message: "Internal server error",
-    });
+
+    // Type assertion to handle the error as an instance of Error
+    if (error instanceof Error) {
+      return createError({
+        statusCode: 500,
+        message: `Internal server error: ${error.message}`,
+      });
+    } else {
+      return createError({
+        statusCode: 500,
+        message: "Internal server error: An unknown error occurred.",
+      });
+    }
+  } finally {
+    await prisma.$disconnect();
   }
 });

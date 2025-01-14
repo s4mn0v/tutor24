@@ -106,7 +106,8 @@ const handleSubmit = async () => {
   error.value = ''
   try {
     if (isRegistering.value) {
-      await register(email.value, password.value, role.value, documentoIdentidad.value, nombre.value, telefono.value)
+      const response = await register(email.value, password.value, role.value, documentoIdentidad.value, nombre.value, telefono.value)
+      console.log('Registration response:', response)
       // After successful registration, switch to login
       isRegistering.value = false
       error.value = 'Registration successful! Please login.'
@@ -114,7 +115,7 @@ const handleSubmit = async () => {
       await login(email.value, password.value)
     }
   } catch (e) {
-    error.value = 'Authentication failed. Please check your credentials.'
+    error.value = e.message || 'Authentication failed. Please check your credentials.'
     console.error('Authentication error', e)
   }
 }

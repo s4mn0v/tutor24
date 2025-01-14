@@ -56,16 +56,16 @@ export const useAuth = () => {
   // Register function
   const register = async (email: string, password: string, role: string, documentoIdentidad: string, nombre: string, telefono: string) => {
     try {
-      const response = await $fetch('/api/register', {
+      const response = await $fetch('/api/auth/register', {
         method: 'POST',
-        body: {
+        body: JSON.stringify({
           email,
           password,
           role,
           documentoIdentidad,
           nombre,
           telefono
-        }
+        }),
       });
       return response;
     } catch (error) {
