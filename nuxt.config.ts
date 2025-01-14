@@ -24,5 +24,31 @@ export default ({
   },
   colorMode: {
     preference: 'light'
-  }
+  },
+  // Optimizaciones de vite
+  vite: {
+    build: {
+      cssMinify: true,
+      minify: "terser",
+      terserOptions: {
+        compress: {
+          drop_console: process.env.NODE_ENV === "production",
+          drop_debugger: process.env.NODE_ENV === "production",
+        },
+      },
+    },
+    optimizeDeps: {
+      include: ["vue", "vue-router"],
+    },
+  },
+  // Configurar la carga perezosa de imágenes
+  experimental: {
+    viewTransition: true,
+    renderJsonPayloads: false,
+    clientFallback: true,
+  },
+  nitro: {
+    compressPublicAssets: true,
+    minify: true,
+  },
 });
