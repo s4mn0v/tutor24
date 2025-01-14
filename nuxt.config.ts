@@ -4,7 +4,8 @@ export default ({
   devtools: { enabled: true },
   ssr: false,
   css: ['~/assets/css/main.css'],
-  modules: ['@prisma/nuxt'],
+  modules: ['@prisma/nuxt', '@nuxt/ui'],
+
   postcss: {
     plugins: {
       tailwindcss: {},
@@ -20,5 +21,8 @@ export default ({
     head: {
       link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }]
     }
+  },
+  colorMode: {
+    preference: 'light'
   }
 });
