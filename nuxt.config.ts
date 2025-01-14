@@ -16,4 +16,9 @@ export default ({
       apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api'
     }
   },
+  app: {
+    head: {
+      link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }]
+    }
+  }
 });
