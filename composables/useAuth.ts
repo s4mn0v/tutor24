@@ -14,11 +14,13 @@ export const useAuth = () => {
 
   // Initialize auth state from localStorage
   const initAuth = () => {
-    const storedToken = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
-    if (storedToken && storedUser) {
-      token.value = storedToken;
-      user.value = JSON.parse(storedUser);
+    if (process.client) {
+      const storedToken = localStorage.getItem("token");
+      const storedUser = localStorage.getItem("user");
+      if (storedToken && storedUser) {
+        token.value = storedToken;
+        user.value = JSON.parse(storedUser);
+      }
     }
   };
 
@@ -69,8 +71,10 @@ export const useAuth = () => {
   const logout = () => {
     user.value = null;
     token.value = null;
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    if (process.client) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+    }
     router.push("/login");
   };
 
@@ -102,7 +106,9 @@ export const useAuth = () => {
   };
 
   // Initialize auth state when composable is used
-  initAuth();
+  if (process.client) {
+    initAuth();
+  }
 
   return {
     user,

@@ -54,29 +54,28 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref } from 'vue'
+import { useRouter, useRoute } from '#app'
 import { useAuth } from '~/composables/useAuth'
 
-const router = useRouter()
+// const router = useRouter()
+const route = useRoute()
 const { login, register, isAuthenticated } = useAuth()
 const email = ref('')
 const password = ref('')
 const role = ref('ESTUDIANTE')
-const isRegistering = ref(false)
+
+// Set initial state based on query parameter
+const isRegistering = ref(route.query.register === 'true')
 const error = ref('')
 
-onMounted(() => {
-  // Redirect if already authenticated
-  if (isAuthenticated()) {
-    const userRole = getUserRole()
-    if (userRole) {
-      redirectBasedOnRole(userRole)
-    }
+// Redirect if already authenticated
+if (isAuthenticated()) {
+  const userRole = getUserRole()
+  if (userRole) {
+    redirectBasedOnRole(userRole)
   }
-  // Check if a query parameter indicates registration
-  isRegistering.value = router.currentRoute.value.query.register === 'true'
-})
+}
 
 const handleSubmit = async () => {
   error.value = ''

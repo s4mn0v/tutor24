@@ -1,3 +1,3 @@
 <template>
-    <h1 class="uppercase">Hola Mundo</h1>
+  <NuxtLink to="/login">Login</NuxtLink>
 </template>
