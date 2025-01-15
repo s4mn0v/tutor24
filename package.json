@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@iconify-json/heroicons": "^1.2.2",
     "@nuxt/ui": "^2.20.0",
     "@prisma/client": "^6.2.1",
     "@prisma/nuxt": "^0.2.0",
@@ -24,6 +25,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
+    "prisma": "^6.2.1",
     "tailwindcss": "^3.4.17"
   }
 }
