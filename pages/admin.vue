@@ -1,11 +1,6 @@
 <template>
-  <div>
-    <NuxtLayout name="nav">
-      <template #title>Admin Dashboard</template>
-      <div class="p-4">
-        <ButtonLogOut />
-        <Theme />
-      </div>
-    </NuxtLayout>
-  </div>
+  <NuxtLayout name="admin">
+    <template #title>Admin</template>
+    <NuxtPage />
+  </NuxtLayout>
 </template>
