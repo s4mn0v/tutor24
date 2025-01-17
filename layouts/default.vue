@@ -1,3 +1,5 @@
 <template>
-  <slot />
+  <div v-cloak>
+    <slot />
+  </div>
 </template>

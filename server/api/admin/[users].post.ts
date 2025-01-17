@@ -1,0 +1,67 @@
+import { PrismaClient, Rol } from "@prisma/client";
+import bcrypt from "bcrypt";
+
+const prisma = new PrismaClient();
+
+interface CreateDocenteBody {
+  documentoIdentidad: string;
+  nombre: string;
+  correo: string;
+  telefono?: string;
+  contrasena: string;
+}
+
+export default defineEventHandler(async (event) => {
+  const body: CreateDocenteBody = await readBody(event);
+  const {
+    documentoIdentidad,
+    nombre,
+    correo,
+    telefono = "",
+    contrasena,
+  } = body;
+
+  // Validar que todos los campos obligatorios estén presentes
+  if (!documentoIdentidad || !nombre || !correo || !contrasena) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Todos los campos son obligatorios.",
+    });
+  }
+
+  try {
+    // Hashear la contraseña
+    const hashedPassword = await bcrypt.hash(contrasena, 10);
+
+    // Crear el usuario con el rol de DOCENTE
+    const user = await prisma.usuario.create({
+      data: {
+        documentoIdentidad,
+        nombre,
+        correo,
+        telefono,
+        contrasena: hashedPassword,
+        rol: Rol.DOCENTE, // Asignar el rol de DOCENTE
+      },
+    });
+
+    return { message: "Docente creado exitosamente", userId: user.id };
+  } catch (error: unknown) {
+    console.error("Error al crear el docente:", error);
+
+    // Manejar errores de Prisma (por ejemplo, correo duplicado)
+    if (error instanceof Error) {
+      return createError({
+        statusCode: 500,
+        message: `Error al crear el docente: ${error.message}`,
+      });
+    } else {
+      return createError({
+        statusCode: 500,
+        message: "Error desconocido al crear el docente.",
+      });
+    }
+  } finally {
+    await prisma.$disconnect();
+  }
+});

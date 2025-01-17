@@ -40,6 +40,10 @@ export default ({
     optimizeDeps: {
       include: ["vue", "vue-router"],
     },
+    // Layout no jode con esto
+    css: {
+      preprocessorMaxWorkes: true,
+    },
   },
   // Configurar la carga perezosa de imágenes
   experimental: {
