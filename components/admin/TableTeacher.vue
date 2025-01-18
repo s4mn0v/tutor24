@@ -78,6 +78,7 @@ const editModal = ref<InstanceType<typeof EditModal> | null>(null) // Referencia
 const createTeacherModal = ref<InstanceType<typeof CreateTeacherModal> | null>(null) // Referencia al modal de creación
 
 const columns = [
+  { key: '', label: '' },
   { key: 'documentoIdentidad', label: 'Documento' },
   { key: 'nombre', label: 'Nombre' },
   { key: 'correo', label: 'Correo' },
@@ -91,7 +92,7 @@ const fetchUsers = async () => {
     query: {
       page: page.value,
       limit: limit.value,
-      search: search.value
+      search: search.value.toLocaleLowerCase()
     }
   })
   users.value = fetchedUsers.map(user => ({

@@ -12,10 +12,10 @@ export default defineEventHandler(async (event) => {
   const whereClause = {
     rol: Rol.DOCENTE,
     OR: [
-      { nombre: { contains: search } },
-      { correo: { contains: search } },
-      { telefono: { contains: search } },
-      { documentoIdentidad: { contains: search } },
+      { nombre: { contains: search.toLocaleLowerCase() } },
+      { correo: { contains: search.toLocaleLowerCase() } },
+      { telefono: { contains: search.toLocaleLowerCase() } },
+      { documentoIdentidad: { contains: search.toLocaleLowerCase() } },
     ],
   };
 
@@ -24,6 +24,15 @@ export default defineEventHandler(async (event) => {
     where: whereClause,
     skip: (page - 1) * limit,
     take: limit,
+    select: {
+      id: true,
+      documentoIdentidad: true, // Asegúrate de que este campo esté incluido
+      nombre: true,
+      correo: true,
+      telefono: true,
+      rol: true,
+      contrasena: true,
+    },
   });
 
   return {
