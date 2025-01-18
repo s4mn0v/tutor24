@@ -1,3 +1,5 @@
+import { theme } from "#tailwind-config";
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default ({
   compatibilityDate: '2024-11-01',
@@ -23,7 +25,8 @@ export default ({
     }
   },
   colorMode: {
-    preference: 'light'
+    preference: 'system', // o 'light', 'dark'
+    fallback: 'light',
   },
   // Optimizaciones de vite
   vite: {
@@ -50,9 +53,10 @@ export default ({
     viewTransition: true,
     renderJsonPayloads: false,
     clientFallback: true,
+    swc: true,
   },
   nitro: {
     compressPublicAssets: true,
     minify: true,
-  },
+  }
 });
