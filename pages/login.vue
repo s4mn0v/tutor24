@@ -47,6 +47,7 @@
               <option value="DOCENTE">Teacher</option>
             </select>
           </div>
+
           <div class="relative">
             <label for="password" class="sr-only">Password</label>
             <input :type="showPassword ? 'text' : 'password'" id="password" name="password"
@@ -85,19 +86,20 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter, useRoute } from '#app'
 import { useAuth } from '~/composables/useAuth'
 
-const router = useRouter()
 const route = useRoute()
 const { login, register, isAuthenticated, getUserRole } = useAuth()
+const router = useRouter()
+
 const email = ref('')
 const password = ref('')
 const role = ref('ADMIN')
 const documentoIdentidad = ref('')
 const nombre = ref('')
 const telefono = ref('')
-const showPassword = ref(false)
+const showPassword = ref(false);
 
 // Set initial state based on query parameter
 const isRegistering = ref(route.query.register === 'true')
@@ -107,7 +109,8 @@ const error = ref('')
 if (isAuthenticated()) {
   const userRole = getUserRole()
   if (userRole) {
-    router.push(getRedirectForRole(userRole))
+    // Redirigir al rol correspondiente
+    router.push(`/${userRole.toLowerCase()}`)
   }
 }
 
@@ -115,28 +118,18 @@ const handleSubmit = async () => {
   error.value = ''
   try {
     if (isRegistering.value) {
-      if (role.value === 'ESTUDIANTE') {
-        await registerStudent(email.value, password.value, documentoIdentidad.value, nombre.value, telefono.value)
-      } else {
-        const response = await register(email.value, password.value, role.value, documentoIdentidad.value, nombre.value, telefono.value)
-        console.log('Registration response:', response)
-        isRegistering.value = false
-        error.value = 'Registration successful! Please login.'
-      }
+      const response = await register(email.value, password.value, role.value, documentoIdentidad.value, nombre.value, telefono.value)
+      console.log('Registration response:', response)
+      // Después del registro exitoso, cambiar a login
+      isRegistering.value = false
+      error.value = 'Registration successful! Please login.'
     } else {
       await login(email.value, password.value)
+      router.push('/') // O la ruta correspondiente después del login
     }
   } catch (e) {
     error.value = e.message || 'Authentication failed. Please check your credentials.'
     console.error('Authentication error', e)
   }
-}
-
-const registerStudent = async (email, password, documentoIdentidad, nombre, telefono) => {
-  // Implement student registration logic here
-  // This is a placeholder function
-  console.log('Registering student:', email, password, documentoIdentidad, nombre, telefono)
-  // After successful registration, redirect or show message
-  router.push('/login')
 }
 </script>
