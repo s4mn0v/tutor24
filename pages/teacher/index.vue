@@ -1,4 +1,8 @@
+<script setup lang="ts">
+import Calendar from '~/components/teacher/Calendar.vue';
+
+</script>
+
 <template>
-  <h1>Bienvenido, Profesor</h1>
-  <p>Esta es la página principal del profesor.</p>
+  <Calendar />
 </template>
