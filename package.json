@@ -4,18 +4,20 @@
   "type": "module",
   "scripts": {
     "build": "nuxt build",
-    "dev": "nuxt dev",
+    "dev": "node --experimental-specifier-resolution=node node_modules/nuxt/bin/nuxt.mjs dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
     "@iconify-json/heroicons": "^1.2.2",
-    "@nuxt/ui": "^2.20.0",
+    "@nuxt/ui": "^2.21.0",
     "@prisma/client": "^6.2.1",
     "@prisma/nuxt": "^0.2.0",
     "bcrypt": "^5.1.1",
     "jsonwebtoken": "^9.0.2",
+    "mammoth": "^1.9.0",
     "nuxt": "^3.15.1",
     "uuid": "^11.0.5",
     "vue": "latest",
@@ -24,9 +26,12 @@
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/jsonwebtoken": "^9.0.7",
+    "@types/pdf-parse": "^1.1.4",
+    "@types/tesseract.js": "^0.0.2",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "prisma": "^6.2.1",
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "^3.4.17",
+    "vue-tsc": "^2.1.10"
   }
 }

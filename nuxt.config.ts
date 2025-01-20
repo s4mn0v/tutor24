@@ -1,12 +1,10 @@
-import { theme } from "#tailwind-config";
-
-// https://nuxt.com/docs/api/configuration/nuxt-config
-export default ({
-  compatibilityDate: '2024-11-01',
+import { theme } from "#tailwind-config"
+export default defineNuxtConfig({
+  compatibilityDate: "2024-11-01",
   devtools: { enabled: true },
   ssr: false,
-  css: ['~/assets/css/main.css'],
-  modules: ['@prisma/nuxt', '@nuxt/ui'],
+  css: ["~/assets/css/main.css"],
+  modules: ["@prisma/nuxt", "@nuxt/ui", "@nuxtjs/tailwindcss"],
 
   postcss: {
     plugins: {
@@ -15,18 +13,19 @@ export default ({
     },
   },
   runtimeConfig: {
+    geminiApiKey: process.env.GEMINI_API_KEY,
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api'
-    }
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || "/api",
+    },
   },
   app: {
     head: {
-      link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }]
-    }
+      link: [{ rel: "icon", type: "image/x-icon", href: "/favicon.ico" }],
+    },
   },
   colorMode: {
-    preference: 'system', // o 'light', 'dark'
-    fallback: 'light',
+    preference: "system",
+    fallback: "light",
   },
   // Optimizaciones de vite
   vite: {
@@ -41,11 +40,11 @@ export default ({
       },
     },
     optimizeDeps: {
-      include: ["vue", "vue-router"],
+      include: ["vue", "vue-router", "@google/generative-ai"],
     },
     // Layout no jode con esto
     css: {
-      preprocessorMaxWorkes: true,
+      preprocessorMaxWorkers: true,
     },
   },
   // Configurar la carga perezosa de imágenes
@@ -53,10 +52,19 @@ export default ({
     viewTransition: true,
     renderJsonPayloads: false,
     clientFallback: true,
-    swc: true,
   },
   nitro: {
     compressPublicAssets: true,
     minify: true,
-  }
-});
+  },
+  // Añadir configuración de TypeScript
+  typescript: {
+    strict: true,
+    typeCheck: true,
+  },
+  // Configuración adicional para Gemini
+  build: {
+    transpile: ["@google/generative-ai"],
+  },
+})
+

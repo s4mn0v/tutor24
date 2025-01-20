@@ -27,28 +27,55 @@ model Estudiante {
   contrasena         String
   asignaturaId       Int
   asignatura         Asignatura @relation(fields: [asignaturaId], references: [id])
+  usuarioId          Int
+  usuario            Usuario   @relation(fields: [usuarioId], references: [id]) // Relación con Usuario
 }
 
 model Asignatura {
-  id              Int          @id @default(autoincrement())
+  id              Int             @id @default(autoincrement())
   nombre          String
+  carrera         String
+  jornada         String
   idDocente       Int
-  activo          Boolean      @default(true)
-  enlaceRegistro  String?      @unique
+  activo          Boolean         @default(true)
+  enlaceRegistro  String?         @unique
   fechaExpiracion DateTime?
-  docente         Usuario      @relation("DocenteAsignaturas", fields: [idDocente], references: [id])
+  docente         Usuario         @relation("DocenteAsignaturas", fields: [idDocente], references: [id])
   estudiantes     Estudiante[]
-  material        Material[]
+  recordatorios   Recordatorio[]  // Relación con recordatorios
+  materiales      Material[]      // Relación con materiales
 }
 
 model Material {
+  id           Int       @id @default(autoincrement())
+  nombre       String    // Nombre del archivo
+  tipo         String    // Tipo de archivo (e.g., PDF, DOCX, etc.)
+  url          String    // URL del archivo almacenado
+  idAsignatura Int       // Relación con la asignatura
+  asignatura   Asignatura @relation(fields: [idAsignatura], references: [id])
+  creadoEn     DateTime   @default(now())
+}
+
+model Event {
   id            Int        @id @default(autoincrement())
-  nombreArchivo String
-  tipoArchivo   String
-  datos         Bytes
+  title         String
+  date          DateTime
+  description   String
+  published     Boolean    @default(false)
   asignaturaId  Int
-  creadoEn      DateTime   @default(now())
   asignatura    Asignatura @relation(fields: [asignaturaId], references: [id])
+}
+
+model Recordatorio {
+  id           Int          @id @default(autoincrement())
+  titulo       String
+  descripcion  String
+  fecha        DateTime
+  importancia  String
+  asignaturaId Int
+  asignatura   Asignatura   @relation(fields: [asignaturaId], references: [id])
+  creadoPorId  Int
+  creadoPor    Usuario      @relation(fields: [creadoPorId], references: [id])
 }
 
 enum Rol {
@@ -56,3 +83,4 @@ enum Rol {
   DOCENTE
   ESTUDIANTE
 }
+

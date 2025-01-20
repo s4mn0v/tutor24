@@ -5,15 +5,11 @@ const prisma = new PrismaClient();
 
 export default defineEventHandler(async (event) => {
   const asignaturaId = Number(event.context.params?.asignaturaId);
-  const body = await readBody(event);
-  const { duracionHoras } = body;
 
   try {
-    const enlaceRegistro = uuidv4(); // Generar un UUID único
-    const fechaExpiracion = new Date();
-    fechaExpiracion.setHours(fechaExpiracion.getHours() + duracionHoras); // Calcular la fecha de expiración
+    const enlaceRegistro = uuidv4();
+    const fechaExpiracion = new Date(Date.now() + 20 * 60 * 1000); // 20 minutos desde ahora
 
-    // Actualizar la asignatura con el enlace y la fecha de expiración
     const asignatura = await prisma.asignatura.update({
       where: { id: asignaturaId },
       data: {

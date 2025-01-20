@@ -1,26 +1,21 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client"
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient()
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
   try {
     const asignaturas = await prisma.asignatura.findMany({
-      where: { idDocente: 1 }, // Cambia esto para obtener el ID del docente autenticado
-      select: {
-        id: true,
-        nombre: true,
-        enlaceRegistro: true,
-        fechaExpiracion: true,
+      include: {
+        estudiantes: true,
       },
-    });
-    return asignaturas;
+    })
+    return asignaturas
   } catch (error) {
-    console.error("Error obteniendo las asignaturas:", error);
-    return createError({
+    console.error("Error al obtener las asignaturas:", error)
+    throw createError({
       statusCode: 500,
-      message: "Error obteniendo las asignaturas",
-    });
-  } finally {
-    await prisma.$disconnect();
+      statusMessage: "Error al obtener las asignaturas",
+    })
   }
-});
+})
+
