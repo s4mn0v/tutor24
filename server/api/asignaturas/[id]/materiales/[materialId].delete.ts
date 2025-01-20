@@ -17,19 +17,21 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    // Buscar el material por ID
     const material = await prisma.material.findUnique({
-      where: { id: materialId, asignaturaId }
+      where: { id: materialId },
     })
 
-    if (!material) {
+    // Verificar si el material existe y pertenece a la asignatura correcta
+    if (!material || material.idAsignatura !== asignaturaId) {
       throw createError({
         statusCode: 404,
-        message: "Material no encontrado"
+        message: "Material no encontrado o no pertenece a esta asignatura"
       })
     }
 
     // Eliminar el archivo del sistema de archivos
-    const filePath = join(process.cwd(), 'uploads', `${material.id}-${material.nombreArchivo}`)
+    const filePath = join(process.cwd(), 'uploads', `${material.id}-${material.nombre}`)
     await unlink(filePath)
 
     // Eliminar el material de la base de datos

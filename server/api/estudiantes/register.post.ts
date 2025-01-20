@@ -1,69 +1,45 @@
-import { PrismaClient } from "@prisma/client";
-import bcrypt from 'bcrypt';
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-interface RegisterBody {
-  nombre: string;
-  correo: string;
-  contrasena: string;
-  documentoIdentidad: string;
-  carrera: string;
-  enlaceRegistro: string;
-}
-
 export default defineEventHandler(async (event) => {
-  const body: RegisterBody = await readBody(event);
-  const { nombre, correo, contrasena, documentoIdentidad, carrera, enlaceRegistro } = body;
-
   try {
-    // Buscar la asignatura por el enlace temporal
-    const asignatura = await prisma.asignatura.findFirst({
-      where: { enlaceRegistro },
+    // Usar event.context para obtener el body de la solicitud
+    const body = await readBody(event);
+    const { documentoIdentidad, nombre, carrera, correo, contrasena, enlaceRegistro } = body;
+
+    // Hasheo de la contraseña
+    const hashedPassword = await bcrypt.hash(contrasena, 10);
+
+    // Buscar la asignatura por el enlace de registro
+    const asignatura = await prisma.asignatura.findUnique({
+      where: { enlaceRegistro: enlaceRegistro }, // Buscar la asignatura usando el enlace único
     });
 
     if (!asignatura) {
-      return createError({
-        statusCode: 404,
-        message: "Enlace no válido o expirado",
-      });
+      console.error("Asignatura no encontrada");
+      return { status: 404, message: 'Asignatura no encontrada' };
     }
 
-    // Verificar si el estudiante ya está registrado
-    const estudianteExistente = await prisma.estudiante.findUnique({
-      where: { correo },
-    });
-
-    if (estudianteExistente) {
-      return createError({
-        statusCode: 400,
-        message: "El correo electrónico ya está registrado",
-      });
-    }
-
-    // Hashear la contraseña
-    const hashedPassword = await bcrypt.hash(contrasena, 10);
-
-    // Crear el estudiante
-    const estudiante = await prisma.estudiante.create({
+    // Crear al nuevo estudiante
+    const nuevoEstudiante = await prisma.estudiante.create({
       data: {
-        nombre,
-        correo,
+        documentoIdentidad: documentoIdentidad,
+        nombre: nombre,
+        carrera: carrera,
+        correo: correo,
         contrasena: hashedPassword,
-        documentoIdentidad,
-        carrera,
-        asignaturaId: asignatura.id,
+        asignaturaId: asignatura.id,  // Asignación automática de la asignatura
+        usuarioId: 1,  // Este valor debe corresponder al ID de un usuario previamente creado
       },
     });
 
-    return { estudiante };
+    console.log("Estudiante registrado:", nuevoEstudiante);
+    return { status: 200, message: 'Estudiante registrado exitosamente' };
+
   } catch (error) {
-    console.error("Error registrando el estudiante:", error);
-    return createError({
-      statusCode: 500,
-      message: "Error registrando el estudiante",
-    });
-  } finally {
-    await prisma.$disconnect();
+    console.error('Error registrando el estudiante:', error);
+    return { status: 500, message: 'Error interno del servidor' };
   }
 });

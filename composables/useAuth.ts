@@ -12,7 +12,7 @@ export const useAuth = () => {
   const token = ref<string | null>(null);
   const router = useRouter();
 
-  // Initialize auth state from localStorage
+  // Inicializar el estado de autenticación desde localStorage
   const initAuth = () => {
     if (process.client) {
       const storedToken = localStorage.getItem("token");
@@ -24,7 +24,7 @@ export const useAuth = () => {
     }
   };
 
-  // Login function
+  // Función para login
   const login = async (email: string, password: string) => {
     try {
       const response = await $fetch<AuthResponse>("/api/auth/login", {
@@ -32,18 +32,18 @@ export const useAuth = () => {
         body: { email, password },
       });
 
-      // Store auth data
+      // Guardar los datos de autenticación
       token.value = response.token;
       user.value = {
         email,
         role: response.role,
       };
 
-      // Save to localStorage
+      // Guardar en localStorage
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(user.value));
 
-      // Redirect based on role
+      // Redirigir según el rol
       redirectBasedOnRole(response.role);
 
       return response;
@@ -53,28 +53,7 @@ export const useAuth = () => {
     }
   };
 
-  // Register function
-  const register = async (email: string, password: string, role: string, documentoIdentidad: string, nombre: string, telefono: string) => {
-    try {
-      const response = await $fetch('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({
-          email,
-          password,
-          role,
-          documentoIdentidad,
-          nombre,
-          telefono
-        }),
-      });
-      return response;
-    } catch (error) {
-      console.error("Register error:", error);
-      throw error;
-    }
-  };
-
-  // Logout function
+  // Función de logout
   const logout = () => {
     user.value = null;
     token.value = null;
@@ -85,17 +64,17 @@ export const useAuth = () => {
     router.push("/login");
   };
 
-  // Check auth state
+  // Verificar si está autenticado
   const isAuthenticated = () => {
     return !!token.value;
   };
 
-  // Get user role
+  // Obtener el rol del usuario
   const getUserRole = () => {
     return user.value?.role;
   };
 
-  // Redirect based on role
+  // Redirigir según el rol
   const redirectBasedOnRole = (role: string) => {
     switch (role) {
       case "ADMIN":
@@ -112,7 +91,7 @@ export const useAuth = () => {
     }
   };
 
-  // Initialize auth state when composable is used
+  // Inicializar el estado de autenticación cuando se use el composable
   if (process.client) {
     initAuth();
   }
@@ -121,7 +100,6 @@ export const useAuth = () => {
     user,
     token,
     login,
-    register,
     logout,
     isAuthenticated,
     getUserRole,

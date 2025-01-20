@@ -15,11 +15,14 @@ export default defineEventHandler(async (event) => {
 
   try {
     const materiales = await prisma.material.findMany({
-      where: { asignaturaId },
+      where: {
+        idAsignatura: asignaturaId, // Usamos el campo idAsignatura para filtrar
+      },
       select: {
         id: true,
-        nombreArchivo: true,
-        tipoArchivo: true,
+        nombre: true, // Usamos 'nombre' en lugar de 'nombreArchivo'
+        tipo: true, // Usamos 'tipo' en lugar de 'tipoArchivo'
+        url: true, // Agregamos 'url' si es necesario
         creadoEn: true,
       },
       orderBy: {
@@ -27,6 +30,7 @@ export default defineEventHandler(async (event) => {
       },
     })
 
+    // Mapeamos la respuesta para devolver la fecha en formato ISO
     return materiales.map((material) => ({
       ...material,
       creadoEn: material.creadoEn.toISOString(),
@@ -41,4 +45,3 @@ export default defineEventHandler(async (event) => {
     await prisma.$disconnect()
   }
 })
-

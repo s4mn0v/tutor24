@@ -31,6 +31,7 @@
 
 <script setup>
 import { ref } from 'vue';
+import { useRoute, navigateTo } from '#app'; // Asegúrate de tener estas funciones de Nuxt 3
 
 const route = useRoute();
 const enlace = route.query.enlace; // Obtener el enlace temporal de la URL

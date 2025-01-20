@@ -1,5 +1,7 @@
 import { defineEventHandler, readBody, createError } from "h3"
 import { PrismaClient } from "@prisma/client"
+import fs from 'fs'
+import path from 'path'
 
 const prisma = new PrismaClient()
 
@@ -48,28 +50,45 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    // Crear el registro en la base de datos
+    // Crear una carpeta para almacenar el archivo si no existe
+    const uploadDir = path.join(process.cwd(), 'uploads', asignaturaId.toString())
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true })
+    }
+
+    // Definir la ruta del archivo
+    const filePath = path.join(uploadDir, filename)
+
+    // Guardar el archivo en el sistema de archivos
+    fs.writeFileSync(filePath, fileData)
+
+    // Crear el registro del material en la base de datos
     const material = await prisma.material.create({
       data: {
-        asignaturaId,
-        nombreArchivo: filename,
-        tipoArchivo: fileType,
-        datos: fileData,
+        nombre: filename, // Nombre del archivo
+        tipo: fileType,   // Tipo de archivo
+        url: filePath,    // Guardamos la URL del archivo en el campo 'url'
+        asignatura: {     // Relación con la asignatura
+          connect: {
+            id: asignaturaId, // ID de la asignatura
+          },
+        },
       },
     })
 
     console.log("Material creado:", {
       // Log para debugging
       id: material.id,
-      nombreArchivo: material.nombreArchivo,
-      tipoArchivo: material.tipoArchivo,
+      nombre: material.nombre,
+      tipo: material.tipo,
+      url: material.url,
     })
 
-    // Devolver la respuesta sin incluir los datos binarios
     return {
       id: material.id,
-      nombreArchivo: material.nombreArchivo,
-      tipoArchivo: material.tipoArchivo,
+      nombre: material.nombre,
+      tipo: material.tipo,
+      url: material.url,
       creadoEn: material.creadoEn.toISOString(),
     }
   } catch (error) {
@@ -82,4 +101,3 @@ export default defineEventHandler(async (event) => {
     await prisma.$disconnect()
   }
 })
-

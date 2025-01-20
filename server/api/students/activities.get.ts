@@ -21,16 +21,16 @@ export default defineEventHandler(async (event) => {
       take: 5,
       select: {
         id: true,
-        nombreArchivo: true,
+        nombre: true,  // Corregido a 'nombre' en lugar de 'nombreArchivo'
         creadoEn: true,
-        tipoArchivo: true,
+        tipo: true,    // Corregido a 'tipo' en lugar de 'tipoArchivo'
       },
     })
     return materials.map((material) => ({
       id: material.id,
-      title: material.nombreArchivo,
+      title: material.nombre,  // Corregido a 'nombre' en lugar de 'nombreArchivo'
       date: material.creadoEn.toISOString(),
-      type: material.tipoArchivo,
+      type: material.tipo,    // Corregido a 'tipo' en lugar de 'tipoArchivo'
     }))
   } catch (error) {
     console.error("Error fetching activities:", error)
@@ -40,4 +40,3 @@ export default defineEventHandler(async (event) => {
     })
   }
 })
-
