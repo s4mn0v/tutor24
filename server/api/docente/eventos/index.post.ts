@@ -1,98 +1,148 @@
-import { PrismaClient } from "@prisma/client";
-import { parse } from "cookie"; // Asegúrate de tener la librería 'cookie' instalada para parsear cookies
-import jwt from "jsonwebtoken"; // Asegúrate de tener la librería 'jsonwebtoken' instalada
+// server/api/docente/eventos/index.post.ts
+import { PrismaClient, Rol } from "@prisma/client";
+import {
+  defineEventHandler,
+  createError,
+  getRequestHeader,
+  readBody,
+  H3Event,
+} from "h3";
+import jwt from "jsonwebtoken";
 
 const prisma = new PrismaClient();
 
-// Tipo para el payload decodificado del JWT
-interface UserPayload {
-  email: string;
-  role: string;
-}
-
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async (event: H3Event) => {
   try {
-    // Obtener cookies de la solicitud
-    const cookies = parse(event.req.headers.cookie || "");
-    const token = cookies.token || null;
-
-    // Verificar si el token existe
-    if (!token) {
+    // Obtener el token del encabezado de autorización
+    const authHeader = getRequestHeader(event, "authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       throw createError({
         statusCode: 401,
-        message: "No autorizado, token no encontrado",
+        message: "No se proporcionó un token de autenticación válido",
+      });
+    }
+    const token = authHeader.split(" ")[1];
+
+    // Verificar que JWT_SECRET existe
+    if (!process.env.JWT_SECRET) {
+      throw createError({
+        statusCode: 500,
+        message:
+          "Error de configuración del servidor: JWT_SECRET no está definido",
       });
     }
 
-    // Verificar autenticación usando el token (decodificando el token JWT)
-    let user: UserPayload;
+    // Decodificar el token para obtener el ID del usuario
+    let decodedToken;
     try {
-      const secret = process.env.JWT_SECRET;
-      if (!secret) {
-        throw new Error("La clave secreta JWT no está definida");
-      }
-      user = jwt.verify(token, secret) as UserPayload; // Utiliza tu clave secreta
-    } catch (err) {
+      decodedToken = jwt.verify(token, process.env.JWT_SECRET) as {
+        userId: number;
+        role: string;
+        email: string;
+      };
+    } catch (jwtError) {
+      console.error("Error al verificar el token:", jwtError);
       throw createError({
         statusCode: 401,
-        message: "Token inválido",
+        message: "Token inválido o expirado",
       });
     }
 
-    if (!user || user.role !== "DOCENTE") {
-      throw createError({
-        statusCode: 401,
-        message: "No autorizado",
-      });
-    }
-
+    // Obtener los datos del cuerpo de la solicitud
     const body = await readBody(event);
+    const { title, description, date, asignaturaId, importance } = body;
 
-    // Validar datos requeridos
-    if (!body.title || !body.date || !body.asignaturaId) {
+    // Validar los campos requeridos
+    if (!title || !description || !date || !asignaturaId || !importance) {
       throw createError({
         statusCode: 400,
         message: "Faltan campos requeridos",
       });
     }
 
-    // Verificar que la asignatura pertenece al docente
+    // Buscar al usuario en la base de datos
+    const usuario = await prisma.usuario.findUnique({
+      where: {
+        id: decodedToken.userId,
+      },
+    });
+
+    if (!usuario) {
+      throw createError({
+        statusCode: 404,
+        message: "Usuario no encontrado",
+      });
+    }
+
+    // Verificar si el usuario tiene permisos para crear recordatorios
+    if (usuario.rol !== Rol.DOCENTE && usuario.rol !== Rol.ADMIN) {
+      throw createError({
+        statusCode: 403,
+        message: "El usuario no tiene permisos para crear recordatorios",
+      });
+    }
+
+    // Verificar si la asignatura existe y está activa
     const asignatura = await prisma.asignatura.findFirst({
       where: {
-        id: body.asignaturaId,
-        docente: {
-          correo: user.email, // Validar que el correo coincide con el del docente
-        },
+        id: Number.parseInt(asignaturaId.toString()),
+        activo: true,
       },
     });
 
     if (!asignatura) {
       throw createError({
         statusCode: 404,
-        message: "La asignatura no existe o no pertenece al docente",
+        message: "Asignatura no encontrada o no está activa",
       });
     }
 
-    // Crear el evento
-    const evento = await prisma.event.create({
+    // Si el usuario es DOCENTE, verificar que la asignatura le pertenece
+    if (usuario.rol === Rol.DOCENTE) {
+      const tienePermiso = await prisma.asignatura.findFirst({
+        where: {
+          id: asignatura.id,
+          idDocente: usuario.id,
+        },
+      });
+      if (!tienePermiso) {
+        throw createError({
+          statusCode: 403,
+          message:
+            "No tienes permiso para crear recordatorios en esta asignatura",
+        });
+      }
+    }
+
+    // Crear el nuevo recordatorio
+    const newRecordatorio = await prisma.recordatorio.create({
       data: {
-        title: body.title,
-        description: body.description || "",
-        date: new Date(body.date),
-        published: body.published ?? true,
-        asignaturaId: body.asignaturaId,
-      },
-      include: {
-        asignatura: true, // Incluir la asignatura relacionada
+        titulo: title,
+        descripcion: description,
+        fecha: new Date(date),
+        importancia: importance,
+        asignaturaId: asignatura.id,
+        creadoPorId: usuario.id,
       },
     });
 
-    return evento;
-  } catch (error) {
-    console.error("Error al crear evento:", error);
-    throw createError({
-      statusCode: 500,
-      message: "Error al crear el evento",
-    });
+    return newRecordatorio;
+  } catch (error: unknown) {
+    console.error("Error detallado:", error);
+
+    if (error instanceof Error) {
+      const statusCode = (error as any).statusCode || 500;
+      throw createError({
+        statusCode,
+        message: error.message,
+      });
+    } else {
+      throw createError({
+        statusCode: 500,
+        message: "Error desconocido al crear el recordatorio",
+      });
+    }
+  } finally {
+    await prisma.$disconnect();
   }
 });

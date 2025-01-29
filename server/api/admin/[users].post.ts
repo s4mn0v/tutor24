@@ -1,5 +1,7 @@
+// server/api/admin/[users].post.ts
 import { PrismaClient, Rol } from "@prisma/client";
 import bcrypt from "bcrypt";
+import { H3Event, defineEventHandler, readBody } from "h3"; // Import the necessary functions
 
 const prisma = new PrismaClient();
 
@@ -11,7 +13,7 @@ interface CreateDocenteBody {
   contrasena: string;
 }
 
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async (event: H3Event) => {
   const body: CreateDocenteBody = await readBody(event);
   const {
     documentoIdentidad,

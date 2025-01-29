@@ -1,10 +1,14 @@
-import { theme } from "#tailwind-config"
+import { theme } from "#tailwind-config";
 export default defineNuxtConfig({
   compatibilityDate: "2024-11-01",
   devtools: { enabled: true },
   ssr: false,
   css: ["~/assets/css/main.css"],
-  modules: ["@prisma/nuxt", "@nuxt/ui", "@nuxtjs/tailwindcss"],
+  modules: [
+    "@prisma/nuxt",
+    "@nuxt/ui",
+    "@nuxtjs/tailwindcss",
+  ],
 
   postcss: {
     plugins: {
@@ -56,6 +60,17 @@ export default defineNuxtConfig({
   nitro: {
     compressPublicAssets: true,
     minify: true,
+    routeRules: {
+      "/api/**": {
+        cors: true,
+        headers: {
+          "Access-Control-Allow-Methods": "GET,HEAD,PUT,PATCH,POST,DELETE",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Credentials": "true",
+          "Access-Control-Allow-Headers": "*",
+        },
+      },
+    },
   },
   // Añadir configuración de TypeScript
   typescript: {
@@ -64,7 +79,6 @@ export default defineNuxtConfig({
   },
   // Configuración adicional para Gemini
   build: {
-    transpile: ["@google/generative-ai"],
+    transpile: ["@google/generative-ai", "cookie"],
   },
-})
-
+});

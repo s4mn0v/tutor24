@@ -1,16 +1,135 @@
+<template>
+  <div class="min-h-screen bg-white dark:bg-transparent">
+    <div class="max-w-7xl mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+      <div class="flex flex-col lg:flex-row">
+        <!-- Calendario -->
+        <div class="w-full lg:w-2/3 p-4">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl lg:text-2xl font-bold text-gray-800 dark:text-white">
+              {{ currentMonthName }} {{ currentYear }}
+            </h2>
+            <div class="flex space-x-2">
+              <button @click="previousMonth" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-900 transition-colors">
+                <i class="i-heroicons-chevron-left-20-solid w-5 h-5 text-gray-600 dark:text-gray-300"></i>
+              </button>
+              <button @click="nextMonth" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                <i class="i-heroicons-chevron-right-20-solid w-5 h-5 text-gray-600 dark:text-gray-300"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-7 gap-1 mb-2">
+            <div v-for="day in daysOfWeek" :key="day" class="text-center font-semibold text-gray-600 dark:text-gray-400 text-xs lg:text-sm">
+              {{ day }}
+            </div>
+          </div>
+
+          <div class="grid grid-cols-7 gap-1">
+            <button
+              v-for="{ date, isCurrentMonth, isToday } in calendarDays"
+              :key="date.toISOString()"
+              @click="selectDate(date)"
+              :class="[
+                'p-1 w-full aspect-square rounded-lg text-center transition-colors text-xs lg:text-sm',
+                isCurrentMonth ? 'hover:bg-blue-100 dark:hover:bg-blue-900' : 'text-gray-400 dark:text-gray-600',
+                isToday ? 'bg-blue-200 dark:bg-blue-800 font-bold' : '',
+                isSelected(date) ? 'bg-blue-500 text-white' : '',
+                isFutureDate(date) ? 'cursor-pointer' : 'cursor-not-allowed',
+              ]"
+              :disabled="!isFutureDate(date)"
+            >
+              <span>{{ date.getDate() }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Recordatorios -->
+        <div class="w-full lg:w-1/3 border-t lg:border-t-0 lg:border-l border-gray-200 dark:border-gray-700 p-4">
+          <h3 class="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Recordatorios</h3>
+          <div class="overflow-y-auto max-h-[calc(100vh-16rem)]">
+            <ul v-if="recordatorios.length" class="space-y-2">
+              <li 
+                v-for="reminder in recordatorios" 
+                :key="reminder.id" 
+                :class="[
+                  'p-3 rounded-lg mb-2 relative',
+                  reminderImportanceClass(reminder.importancia)
+                ]"
+              >
+                <button 
+                  @click="deleteReminder(reminder.id)" 
+                  class="absolute top-2 right-2 text-red-500 hover:text-red-700 dark:hover:text-red-400"
+                  aria-label="Eliminar recordatorio"
+                >
+                  <i class="i-heroicons-trash-20-solid w-5 h-5"></i>
+                </button>
+                <div>
+                  <h4 class="font-semibold text-gray-800 dark:text-white">{{ reminder.titulo }}</h4>
+                  <p class="text-sm text-gray-600 dark:text-gray-400">{{ reminder.descripcion }}</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                    Fecha: {{ formatDate(new Date(reminder.fecha)) }}
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                    Asignatura: {{ getAsignaturaNombre(reminder.asignaturaId) }}
+                  </p>
+                </div>
+              </li>
+            </ul>
+            <p v-else class="text-gray-600 dark:text-gray-400">No hay recordatorios.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Recordatorio -->
+    <UModal v-model="showModal">
+      <div class="bg-white dark:bg-gray-800 rounded-lg p-6">
+        <h3 class="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Nuevo Recordatorio</h3>
+        <form @submit.prevent="addReminder" class="space-y-4">
+          <UFormGroup label="Título" name="title">
+            <UInput v-model="newReminder.title" placeholder="Título del recordatorio" required />
+          </UFormGroup>
+          <UFormGroup label="Descripción" name="description">
+            <UTextarea v-model="newReminder.description" placeholder="Descripción del recordatorio" />
+          </UFormGroup>
+          <UFormGroup label="Asignatura" name="asignatura">
+            <USelect v-model="newReminder.asignaturaId" :options="asignaturasOptions" placeholder="Selecciona una asignatura" required />
+          </UFormGroup>
+          <UFormGroup label="Importancia" name="importance">
+            <USelect v-model="newReminder.importance" :options="importanceOptions" placeholder="Selecciona la importancia" required />
+          </UFormGroup>
+          <div class="flex justify-end space-x-2">
+            <UButton color="gray" @click="showModal = false">Cancelar</UButton>
+            <UButton color="primary" type="submit" :loading="isLoading">Guardar</UButton>
+          </div>
+        </form>
+      </div>
+    </UModal>
+
+    <!-- Toast Notification -->
+    <div v-if="notification" :class="[
+      'fixed bottom-4 right-4 p-4 rounded-lg shadow-lg transition-opacity duration-300',
+      { 'bg-green-500': notification.type === 'success',
+        'bg-red-500': notification.type === 'error',
+        'bg-blue-500': notification.type === 'info',
+        'bg-yellow-500': notification.type === 'warning' }
+    ]">
+      {{ notification.message }}
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useAuth } from '~/composables/useAuth';
 
-interface Evento {
+interface Recordatorio {
   id: number;
-  title: string;
-  date: string;
-  importance: 'low' | 'medium' | 'high';
-  asignatura: {
-    id: number;
-    nombre: string;
-  };
+  titulo: string;
+  descripcion: string;
+  fecha: string;
+  asignaturaId: number;
+  importancia: 'BAJA' | 'MEDIA' | 'ALTA';
 }
 
 interface Asignatura {
@@ -18,61 +137,46 @@ interface Asignatura {
   nombre: string;
 }
 
-interface CalendarResponse {
-  eventos: Evento[];
-  asignaturas: Asignatura[];
+interface Notification {
+  message: string;
+  type: 'success' | 'error' | 'info' | 'warning';
 }
 
-interface NewReminder {
-  text: string;
-  date: Date | null;
-  importance: 'low' | 'medium' | 'high';
-  asignaturaId: number | null;
+interface EventoResponse {
+  id: number;
+  title: string;
+  description: string;
+  date: string;
+  importance: 'BAJA' | 'MEDIA' | 'ALTA';
+  asignatura: {
+    id: number;
+    nombre: string;
+  };
 }
 
-const { user } = useAuth();
-const currentDate = ref<Date>(new Date());
+const { token, refreshToken } = useAuth();
+const currentDate = ref(new Date());
 const selectedDate = ref<Date | null>(null);
 const showModal = ref(false);
+const isLoading = ref(false);
+const recordatorios = ref<Recordatorio[]>([]);
 const asignaturas = ref<Asignatura[]>([]);
-const eventos = ref<Evento[]>([]);
-const selectedAsignatura = ref<string | number | undefined>(undefined);
+const notification = ref<Notification | null>(null);
 
-const newReminder = ref<NewReminder>({
-  text: '',
-  date: null,
-  importance: 'medium',
-  asignaturaId: null
+const newReminder = ref({
+  title: '',
+  description: '',
+  asignaturaId: 0,
+  importance: ''
 });
 
-const daysOfWeek = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
-
-const monthNames = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-];
+const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 const currentMonthName = computed(() => monthNames[currentDate.value.getMonth()]);
 const currentYear = computed(() => currentDate.value.getFullYear());
 
-const fetchEventos = async () => {
-  try {
-    const response = await $fetch<CalendarResponse>('/api/docente/eventos');
-    eventos.value = response.eventos;
-    asignaturas.value = response.asignaturas;
-  } catch (error) {
-    console.error('Error al obtener eventos:', error);
-  }
-};
-
-interface CalendarDay {
-  date: Date;
-  isCurrentMonth: boolean;
-  isToday: boolean;
-  hasReminder: boolean;
-}
-
-const calendarDays = computed<CalendarDay[]>(() => {
+const calendarDays = computed(() => {
   const year = currentDate.value.getFullYear();
   const month = currentDate.value.getMonth();
   const firstDay = new Date(year, month, 1);
@@ -80,44 +184,39 @@ const calendarDays = computed<CalendarDay[]>(() => {
   const daysInMonth = lastDay.getDate();
   const startingDayOfWeek = firstDay.getDay();
 
-  const days: CalendarDay[] = [];
+  const days = [];
 
-  // Add days from previous month
-  for (let i = startingDayOfWeek - 1; i >= 0; i--) {
-    const date = new Date(year, month, -i);
-    days.push({ 
-      date, 
-      isCurrentMonth: false, 
-      isToday: isToday(date), 
-      hasReminder: hasReminder(date) 
-    });
+  for (let i = 0; i < startingDayOfWeek; i++) {
+    const date = new Date(year, month, -startingDayOfWeek + i + 1);
+    days.push({ date, isCurrentMonth: false, isToday: isToday(date) });
   }
 
-  // Add days of current month
   for (let i = 1; i <= daysInMonth; i++) {
     const date = new Date(year, month, i);
-    days.push({ 
-      date, 
-      isCurrentMonth: true, 
-      isToday: isToday(date), 
-      hasReminder: hasReminder(date) 
-    });
+    days.push({ date, isCurrentMonth: true, isToday: isToday(date) });
   }
 
-  // Add days from next month
   const remainingDays = 42 - days.length;
   for (let i = 1; i <= remainingDays; i++) {
     const date = new Date(year, month + 1, i);
-    days.push({ 
-      date, 
-      isCurrentMonth: false, 
-      isToday: isToday(date), 
-      hasReminder: hasReminder(date) 
-    });
+    days.push({ date, isCurrentMonth: false, isToday: isToday(date) });
   }
 
   return days;
 });
+
+const asignaturasOptions = computed(() => 
+  asignaturas.value.map(asignatura => ({
+    label: asignatura.nombre,
+    value: asignatura.id
+  }))
+);
+
+const importanceOptions = [
+  { label: 'Baja', value: 'BAJA' },
+  { label: 'Media', value: 'MEDIA' },
+  { label: 'Alta', value: 'ALTA' },
+];
 
 const previousMonth = () => {
   currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1, 1);
@@ -128,12 +227,10 @@ const nextMonth = () => {
 };
 
 const selectDate = (date: Date) => {
-  if (isPastDate(date)) {
-    return; // No permitir seleccionar fechas pasadas
-  }
   selectedDate.value = date;
-  newReminder.value.date = date;
-  showModal.value = true;
+  if (isFutureDate(date)) {
+    showModal.value = true;
+  }
 };
 
 const isSelected = (date: Date) => {
@@ -145,226 +242,178 @@ const isToday = (date: Date) => {
   return date.toDateString() === today.toDateString();
 };
 
-const isPastDate = (date: Date) => {
+const isFutureDate = (date: Date) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return date < today;
+  return date >= today;
 };
 
-const hasReminder = (date: Date) => {
-  return eventos.value.some((evento: Evento) =>
-    new Date(evento.date).toDateString() === date.toDateString()
-  );
+const reminderImportanceClass = (importance: string) => {
+  switch (importance) {
+    case 'BAJA':
+      return 'border-l-4 border-green-500 bg-green-50 dark:bg-green-900';
+    case 'MEDIA':
+      return 'border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-900';
+    case 'ALTA':
+      return 'border-l-4 border-red-500 bg-red-50 dark:bg-red-900';
+    default:
+      return 'border-l-4 border-gray-500 bg-gray-50 dark:bg-gray-800';
+  }
+};
+
+const showNotification = (message: string, type: 'success' | 'error' | 'info' | 'warning') => {
+  notification.value = { message, type };
+  setTimeout(() => {
+    notification.value = null;
+  }, 5000);
+};
+
+const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+  const headers = {
+    ...options.headers,
+    'Authorization': `Bearer ${token.value}`,
+    'Content-Type': 'application/json',
+  };
+
+  try {
+    const response = await fetch(url, { ...options, headers });
+
+    if (response.status === 401) {
+      // Token ha expirado, intentamos refrescarlo
+      await refreshToken();
+      headers['Authorization'] = `Bearer ${token.value}`;
+      return fetch(url, { ...options, headers });
+    }
+
+    return response;
+  } catch (error) {
+    console.error('Error en la petición API:', error);
+    throw error;
+  }
+};
+
+const fetchRecordatorios = async () => {
+  try {
+    const response = await fetchWithAuth('/api/docente/eventos');
+    if (!response.ok) {
+      throw new Error('Error al obtener recordatorios');
+    }
+    const data = await response.json();
+    
+    if (Array.isArray(data.eventos)) {
+      recordatorios.value = data.eventos.map((evento: EventoResponse) => ({
+        id: evento.id,
+        titulo: evento.title,
+        descripcion: evento.description,
+        fecha: evento.date,
+        asignaturaId: evento.asignatura.id,
+        importancia: evento.importance
+      }));
+    } else {
+      recordatorios.value = [];
+      console.error('La respuesta de eventos no es un array:', data.eventos);
+    }
+
+    if (Array.isArray(data.asignaturas)) {
+      asignaturas.value = data.asignaturas;
+    } else {
+      asignaturas.value = [];
+      console.error('La respuesta de asignaturas no es un array:', data.asignaturas);
+    }
+  } catch (error) {
+    console.error('Error al obtener datos:', error);
+    showNotification('Error al cargar los datos. Por favor, intenta de nuevo más tarde.', 'error');
+  }
 };
 
 const addReminder = async () => {
-  if (!selectedAsignatura.value) {
-    // TODO: Mostrar mensaje de error
+  if (!selectedDate.value || !newReminder.value.title || !newReminder.value.asignaturaId || !newReminder.value.importance) {
+    showNotification('Por favor, completa todos los campos requeridos.', 'error');
     return;
   }
 
-  if (newReminder.value.text.trim() && newReminder.value.date && !isPastDate(newReminder.value.date)) {
-    try {
-      await $fetch('/api/docente/eventos', {
-        method: 'POST',
-        body: {
-          title: newReminder.value.text,
-          description: newReminder.value.text,
-          date: newReminder.value.date.toISOString(),
-          published: true,
-          asignaturaId: parseInt(selectedAsignatura.value.toString(), 10)
-        }
-      });
+  isLoading.value = true;
+  try {
+    const response = await fetchWithAuth('/api/docente/eventos', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: newReminder.value.title,
+        description: newReminder.value.description,
+        date: selectedDate.value.toISOString(),
+        asignaturaId: newReminder.value.asignaturaId,
+        importance: newReminder.value.importance
+      })
+    });
 
-      await fetchEventos();
-
-      newReminder.value = {
-        text: '',
-        date: null,
-        importance: 'medium',
-        asignaturaId: null
-      };
-      newReminder.value.asignaturaId = parseInt(selectedAsignatura.value.toString(), 10);
-      showModal.value = false;
-    } catch (error) {
-      console.error('Error al crear recordatorio:', error);
-      // TODO: Mostrar mensaje de error
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Error al crear recordatorio');
     }
+
+    await fetchRecordatorios();
+    showModal.value = false;
+    newReminder.value = { title: '', description: '', asignaturaId: 0, importance: '' };
+    showNotification('Recordatorio creado exitosamente', 'success');
+  } catch (error: any) {
+    console.error('Error al crear recordatorio:', error);
+    showNotification('Error al crear el recordatorio: ' + error.message, 'error');
+  } finally {
+    isLoading.value = false;
   }
 };
 
 const deleteReminder = async (id: number) => {
   try {
-    await $fetch(`/api/docente/eventos/${id}`, {
-      method: 'DELETE'
+    const response = await fetchWithAuth(`/api/docente/eventos/${id}`, {
+      method: 'DELETE',
     });
-    await fetchEventos();
-  } catch (error) {
+
+    if (!response.ok) {
+      throw new Error('Error al eliminar recordatorio');
+    }
+
+    const data = await response.json();
+    if (data.success) {
+      await fetchRecordatorios();
+      showNotification('Recordatorio eliminado exitosamente', 'success');
+    } else {
+      throw new Error(data.message || 'Error al eliminar el recordatorio');
+    }
+  } catch (error: any) {
     console.error('Error al eliminar recordatorio:', error);
-    // TODO: Mostrar mensaje de error
+    showNotification('Error al eliminar el recordatorio: ' + error.message, 'error');
   }
 };
 
-
-const formatDate = (date: Date | string) => {
-  return new Date(date).toLocaleDateString('es', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short'
-  });
+const formatDate = (date: Date) => {
+  return date.toLocaleDateString('es', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 };
 
-const getReminderColor = (importance: string) => {
-  switch (importance) {
-    case 'low':
-      return 'bg-green-50 dark:bg-green-900/20';
-    case 'medium':
-      return 'bg-yellow-50 dark:bg-yellow-900/20';
-    case 'high':
-      return 'bg-red-50 dark:bg-red-900/20';
-    default:
-      return 'bg-gray-50 dark:bg-gray-900/20';
-  }
+const getAsignaturaNombre = (id: number) => {
+  const asignatura = asignaturas.value.find(a => a.id === id);
+  return asignatura ? asignatura.nombre : 'Desconocida';
 };
 
-const getReminderBadgeColor = (importance: string) => {
-  switch (importance) {
-    case 'low':
-      return 'green';
-    case 'medium':
-      return 'yellow';
-    case 'high':
-      return 'red';
-    default:
-      return 'gray';
-  }
-};
-
-onMounted(async () => {
-  await fetchEventos();
-});
+onMounted(fetchRecordatorios);
+watch(currentDate, fetchRecordatorios);
 </script>
 
-<template>
-  <div class="teacher-calendar w-full h-full flex flex-col bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-zinc-800 dark:to-zinc-900 p-4 rounded-lg">
-    <div class="flex flex-col lg:flex-row gap-4 h-full max-h-[calc(50vh-2rem)]">
-      <!-- Calendario -->
-      <div class="flex-grow bg-white dark:bg-gray-700 rounded-xl shadow-xl overflow-hidden flex flex-col min-h-[30vh] lg:min-h-0 lg:max-h-[calc(50vh-2rem)]">
-        <div class="p-2 sm:p-4 flex-grow flex flex-col">
-          <div class="flex justify-between items-center mb-2">
-            <h2 class="text-base sm:text-lg font-bold text-indigo-700 dark:text-indigo-300">
-              {{ currentMonthName }} {{ currentYear }}
-            </h2>
-            <div class="flex space-x-2">
-              <UButton color="indigo" variant="ghost" icon="i-heroicons-chevron-left" size="xs" @click="previousMonth" />
-              <UButton color="indigo" variant="ghost" icon="i-heroicons-chevron-right" size="xs" @click="nextMonth" />
-            </div>
-          </div>
-          <div class="grid grid-cols-7 gap-1 mb-1">
-            <div v-for="day in daysOfWeek" :key="day" class="text-center text-xs font-medium text-gray-500 dark:text-gray-400">
-              {{ day }}
-            </div>
-          </div>
-          <div class="grid grid-cols-7 gap-1 flex-grow">
-            <UButton v-for="{ date, isCurrentMonth, isToday, hasReminder } in calendarDays" :key="date.toISOString()"
-              @click="selectDate(date)" :color="isSelected(date) ? 'indigo' : isToday ? 'gray' : 'white'"
-              :variant="isSelected(date) ? 'solid' : isToday ? 'soft' : 'ghost'"
-              :disabled="isPastDate(date)"
-              class="aspect-square flex flex-col items-center justify-center p-0 text-xs rounded-md transition-all duration-200 ease-in-out"
-              :class="{
-                'opacity-50': !isCurrentMonth || isPastDate(date),
-                'font-bold': hasReminder || isToday,
-                'cursor-not-allowed': isPastDate(date)
-              }">
-              <span :class="{ 'text-indigo-600 dark:text-indigo-400': isToday && !isSelected(date) }">
-                {{ date.getDate() }}
-              </span>
-              <div v-if="hasReminder" class="w-1 h-1 bg-red-500 rounded-full mt-0.5"></div>
-            </UButton>
-          </div>
-        </div>
-      </div>
-
-      <!-- Recordatorios -->
-      <div class="w-full lg:w-1/3 xl:w-1/4 bg-white dark:bg-gray-700 rounded-xl shadow-xl flex flex-col min-h-[20vh] lg:min-h-0 lg:max-h-[calc(50vh-2rem)]">
-        <div class="p-2 sm:p-4 flex flex-col h-full">
-          <h3 class="text-base font-semibold mb-2 text-indigo-700 dark:text-indigo-300">Recordatorios</h3>
-          <div class="flex-grow overflow-y-auto pr-2">
-            <div v-if="eventos.length > 0" class="space-y-2">
-              <UCard v-for="evento in eventos" :key="evento.id" :ui="{
-                base: 'transition-all duration-200 ease-in-out hover:shadow-md',
-                background: getReminderColor(evento.importance),
-                divide: 'divide-y divide-gray-200 dark:divide-gray-600'
-              }">
-                <template #header>
-                  <div class="flex justify-between items-center">
-                    <p class="text-xs font-medium">{{ formatDate(evento.date) }}</p>
-                    <p class="text-xs text-gray-500">{{ evento.asignatura.nombre }}</p>
-                  </div>
-                </template>
-                <div class="py-1">
-                  <p class="text-xs">{{ evento.title }}</p>
-                </div>
-                <template #footer>
-                  <div class="flex justify-end">
-                    <UButton color="red" variant="ghost" icon="i-heroicons-trash" size="xs" @click="deleteReminder(evento.id)" />
-                  </div>
-                </template>
-              </UCard>
-            </div>
-            <p v-else class="text-gray-500 dark:text-gray-400 text-center mt-4 text-xs">
-              No hay recordatorios. Haz clic en un día para agregar uno.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal para agregar recordatorio -->
-    <UModal v-model="showModal">
-      <UCard :ui="{ divide: 'divide-y divide-gray-100 dark:divide-gray-700' }">
-        <template #header>
-          <h3 class="text-base font-semibold">
-            Agregar Recordatorio
-          </h3>
-        </template>
-        <form @submit.prevent="addReminder" class="space-y-4">
-          <UFormGroup label="Asignatura" name="asignatura" required>
-            <USelect
-              v-model="selectedAsignatura"
-              :options="asignaturas.map((a: Asignatura) => ({ label: a.nombre, value: a.id.toString() }))"
-              placeholder="Selecciona una asignatura"
-            />
-          </UFormGroup>
-          <UFormGroup label="Recordatorio" name="reminder-text">
-            <UTextarea v-model="newReminder.text" placeholder="Escribe tu recordatorio" required class="resize-none" />
-          </UFormGroup>
-          <UFormGroup label="Importancia" name="reminder-importance">
-            <USelect v-model="newReminder.importance" :options="[
-              { label: 'Baja', value: 'low' },
-              { label: 'Media', value: 'medium' },
-              { label: 'Alta', value: 'high' }
-            ]" />
-          </UFormGroup>
-        </form>
-        <template #footer>
-          <div class="flex justify-end space-x-2">
-            <UButton color="gray" variant="soft" size="sm" @click="showModal = false" class="text-black dark:text-black dark:hover:text-white">
-              Cancelar
-            </UButton>
-            <UButton size="sm" @click="addReminder" :disabled="!selectedAsignatura">
-              Agregar
-            </UButton>
-          </div>
-        </template>
-      </UCard>
-    </UModal>
-  </div>
-</template>
-
 <style scoped>
-.teacher-calendar {
-  height: calc(50vh);
+@media (max-width: 1023px) {
+  .calendar-container {
+    padding: 0.5rem;
+  }
+  
+  .grid-cols-7 {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  
+  .text-2xl {
+    font-size: 1.25rem;
+  }
+  
+  .p-4 {
+    padding: 0.75rem;
+  }
 }
 </style>
-

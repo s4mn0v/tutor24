@@ -1,5 +1,6 @@
 // server/api/admin/[users].delete.ts
 import { PrismaClient } from "@prisma/client";
+import { defineEventHandler, readBody, createError } from "h3"; // Importing necessary functions
 
 const prisma = new PrismaClient();
 

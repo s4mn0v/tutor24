@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-transparent p-4 sm:p-6 rounded-lg shadow-xl">
+  <div class="bg-transparent p-4 sm:p-6">
     <UContainer>
       <div class="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
         <h2 class="text-2xl font-bold text-blue-600">Asignaturas</h2>

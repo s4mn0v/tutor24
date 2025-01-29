@@ -12,17 +12,11 @@
       </div>
     </div>
     <form @submit.prevent="sendMessage" class="flex">
-      <input 
-        v-model="userInput"
-        type="text"
-        placeholder="Haz una pregunta sobre matemáticas..."
-        class="flex-grow p-2 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-      >
-      <button 
-        type="submit"
+      <input v-model="userInput" type="text" placeholder="Haz una pregunta sobre matemáticas..."
+        class="flex-grow p-2 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+      <button type="submit"
         class="bg-blue-600 text-white px-4 py-2 rounded-r-lg hover:bg-blue-700 transition-colors dark:bg-blue-700 dark:hover:bg-blue-600"
-        :disabled="isLoading"
-      >
+        :disabled="isLoading">
         {{ isLoading ? 'Enviando...' : 'Enviar' }}
       </button>
     </form>
@@ -43,6 +37,10 @@ const chatMessages = ref<ChatMessage[]>([
   { role: 'assistant', content: 'Hola, soy tu asistente de matemáticas. ¿En qué puedo ayudarte hoy?' }
 ])
 
+interface ApiResponse {
+  text: string;
+}
+
 const sendMessage = async () => {
   if (!userInput.value.trim() || isLoading.value) return
 
@@ -52,7 +50,7 @@ const sendMessage = async () => {
   isLoading.value = true
 
   try {
-    const response = await $fetch('/api/students/chat', {
+    const response = await $fetch<ApiResponse>('/api/students/chat', {
       method: 'POST',
       body: { message: userMessage }
     })
@@ -65,4 +63,3 @@ const sendMessage = async () => {
   }
 }
 </script>
-

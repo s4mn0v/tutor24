@@ -1,5 +1,6 @@
 // server/api/asignaturas/inscribir.post.ts
 import { PrismaClient } from "@prisma/client";
+import { defineEventHandler, readBody, createError } from "h3";
 
 const prisma = new PrismaClient();
 

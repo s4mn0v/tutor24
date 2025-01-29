@@ -1,15 +1,17 @@
-import { PrismaClient } from "@prisma/client"
+// server/api/asignaturas/[id].delete.ts
+import { PrismaClient } from "@prisma/client";
+import { H3Event, defineEventHandler } from "h3"; // Import the necessary functions
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
-export default defineEventHandler(async (event) => {
-  const id = event.context.params?.id
+export default defineEventHandler(async (event: H3Event) => {
+  const id = event.context.params?.id;
 
   if (!id) {
     throw createError({
       statusCode: 400,
       statusMessage: "ID de asignatura no proporcionado",
-    })
+    });
   }
 
   try {
@@ -18,22 +20,30 @@ export default defineEventHandler(async (event) => {
       where: {
         asignaturaId: Number.parseInt(id),
       },
-    })
+    });
 
     // Luego, eliminamos la asignatura
     await prisma.asignatura.delete({
       where: {
         id: Number.parseInt(id),
       },
-    })
+    });
 
-    return { message: "Asignatura y estudiantes asociados eliminados exitosamente" }
+    return {
+      message: "Asignatura y estudiantes asociados eliminados exitosamente",
+    };
   } catch (error) {
-    console.error("Error al eliminar la asignatura:", error)
-    throw createError({
-      statusCode: 500,
-      statusMessage: "Error al eliminar la asignatura",
-    })
+    console.error("Error detallado al eliminar la asignatura:", error);
+    if (error instanceof Error) {
+      throw createError({
+        statusCode: 500,
+        statusMessage: `Error al eliminar la asignatura: ${error.message}`,
+      });
+    } else {
+      throw createError({
+        statusCode: 500,
+        statusMessage: "Error desconocido al eliminar la asignatura",
+      });
+    }
   }
-})
-
+});

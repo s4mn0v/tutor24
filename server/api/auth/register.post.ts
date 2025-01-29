@@ -1,5 +1,7 @@
+// server/api/auth/register.post.ts
 import { PrismaClient, Rol } from "@prisma/client";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
+import { defineEventHandler, readBody, createError } from "h3";
 
 const prisma = new PrismaClient();
 
@@ -7,8 +9,8 @@ interface RegisterBody {
   email: string;
   password: string;
   role: Rol;
-  documentoIdentidad?: string;
-  nombre?: string;
+  documentoIdentidad: string;
+  nombre: string;
   telefono?: string;
 }
 
@@ -18,12 +20,43 @@ export default defineEventHandler(async (event) => {
     email,
     password,
     role,
-    documentoIdentidad = "temp",
-    nombre = "Temporary Name",
+    documentoIdentidad,
+    nombre,
     telefono = "",
   } = body;
 
+  // Validación de entrada
+  if (!email || !password || !role || !documentoIdentidad || !nombre) {
+    return createError({
+      statusCode: 400,
+      message: "Todos los campos son obligatorios excepto el teléfono.",
+    });
+  }
+
+  // Rechazar intentos de registro con rol "ESTUDIANTE"
+  if (role === "ESTUDIANTE") {
+    return createError({
+      statusCode: 400,
+      message: "No se permite el registro directo de estudiantes.",
+    });
+  }
+
   try {
+    // Verificar si el usuario ya existe
+    const existingUser = await prisma.usuario.findFirst({
+      where: {
+        OR: [{ correo: email }, { documentoIdentidad: documentoIdentidad }],
+      },
+    });
+
+    if (existingUser) {
+      return createError({
+        statusCode: 400,
+        message:
+          "Ya existe un usuario con este correo o documento de identidad.",
+      });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await prisma.usuario.create({
@@ -37,20 +70,19 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    return { message: "User registered successfully", userId: user.id };
+    return { message: "Usuario registrado exitosamente", userId: user.id };
   } catch (error: unknown) {
-    console.error("Registration error:", error);
+    console.error("Error de registro:", error);
 
-    // Type assertion to handle the error as an instance of Error
     if (error instanceof Error) {
       return createError({
         statusCode: 500,
-        message: `Internal server error: ${error.message}`,
+        message: `Error interno del servidor: ${error.message}`,
       });
     } else {
       return createError({
         statusCode: 500,
-        message: "Internal server error: An unknown error occurred.",
+        message: "Error interno del servidor: Ocurrió un error desconocido.",
       });
     }
   } finally {

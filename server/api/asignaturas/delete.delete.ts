@@ -1,8 +1,10 @@
+// server/api/asignaturas/delete.delete.ts
 import { PrismaClient } from "@prisma/client";
+import { H3Event, defineEventHandler, readBody } from "h3"; // Import the necessary functions
 
 const prisma = new PrismaClient();
 
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async (event: H3Event) => {
   const body = await readBody(event);
   const { id } = body;
 
@@ -17,7 +19,9 @@ export default defineEventHandler(async (event) => {
       where: { id },
     });
 
-    return { message: "Asignatura y estudiantes asociados eliminados exitosamente" };
+    return {
+      message: "Asignatura y estudiantes asociados eliminados exitosamente",
+    };
   } catch (error) {
     console.error("Error eliminando la asignatura:", error);
     return createError({

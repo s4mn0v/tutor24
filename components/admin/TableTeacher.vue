@@ -66,6 +66,11 @@ interface User {
   contrasena: string;
 }
 
+interface UsersResponse {
+  users: User[];
+  total: number;
+}
+
 const search = ref('')
 const page = ref(1)
 const limit = ref(50)
@@ -87,20 +92,21 @@ const columns = [
 ]
 
 const fetchUsers = async () => {
-  loading.value = true
-  const { users: fetchedUsers, total: fetchedTotal } = await $fetch('/api/admin/users', {
+  loading.value = true;
+  const response = await $fetch<UsersResponse>('/api/admin/users', {
     query: {
       page: page.value,
       limit: limit.value,
       search: search.value.toLocaleLowerCase()
     }
-  })
+  });
+  const { users: fetchedUsers, total: fetchedTotal } = response;
   users.value = fetchedUsers.map(user => ({
     ...user,
     telefono: user.telefono || ''
-  }))
-  total.value = fetchedTotal
-  loading.value = false
+  }));
+  total.value = fetchedTotal;
+  loading.value = false;
 }
 
 // Watchers para actualizar la tabla cuando cambia la página o la búsqueda

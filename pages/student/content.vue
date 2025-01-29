@@ -3,12 +3,9 @@
       <h2 class="text-2xl font-semibold mb-4 text-gray-800 dark:text-white">Contenido del Curso</h2>
       <div v-if="materials.length > 0">
         <div v-for="material in materials" :key="material.id" class="mb-4 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">
-          <h3 class="text-lg font-semibold text-gray-800 dark:text-white">{{ material.name }}</h3>
-          <p class="text-gray-600 dark:text-gray-300">{{ material.description }}</p>
+          <h3 class="text-lg font-semibold text-gray-800 dark:text-white">{{ material.nombre }}</h3>
           <div class="mt-2">
-            <a :href="material.fileUrl" target="_blank" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200">Ver en línea</a>
-            <span class="mx-2">|</span>
-            <a :href="material.fileUrl" download class="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200">Descargar</a>
+            <a :href="material.url" target="_blank" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200">Ver en línea</a>
           </div>
         </div>
       </div>
@@ -23,9 +20,8 @@
   
   interface Material {
     id: number
-    name: string
-    description: string
-    fileUrl: string
+    nombre: string
+    url: string
   }
   
   const materials = ref<Material[]>([])

@@ -1,9 +1,11 @@
+// server/api/asignaturas/generate-link.post.ts
 import { PrismaClient } from "@prisma/client";
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from "uuid";
+import { H3Event, defineEventHandler, readBody } from "h3"; // Import the necessary functions
 
 const prisma = new PrismaClient();
 
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async (event: H3Event) => {
   const asignaturaId = Number(event.context.params?.asignaturaId);
   const body = await readBody(event);
   const { duracionHoras } = body;

@@ -1,5 +1,7 @@
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+// server/api/estudiantes/register.post.ts
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
+import { defineEventHandler, readBody } from "h3";
 
 const prisma = new PrismaClient();
 
@@ -7,7 +9,14 @@ export default defineEventHandler(async (event) => {
   try {
     // Usar event.context para obtener el body de la solicitud
     const body = await readBody(event);
-    const { documentoIdentidad, nombre, carrera, correo, contrasena, enlaceRegistro } = body;
+    const {
+      documentoIdentidad,
+      nombre,
+      carrera,
+      correo,
+      contrasena,
+      enlaceRegistro,
+    } = body;
 
     // Hasheo de la contraseña
     const hashedPassword = await bcrypt.hash(contrasena, 10);
@@ -19,7 +28,7 @@ export default defineEventHandler(async (event) => {
 
     if (!asignatura) {
       console.error("Asignatura no encontrada");
-      return { status: 404, message: 'Asignatura no encontrada' };
+      return { status: 404, message: "Asignatura no encontrada" };
     }
 
     // Crear al nuevo estudiante
@@ -30,16 +39,15 @@ export default defineEventHandler(async (event) => {
         carrera: carrera,
         correo: correo,
         contrasena: hashedPassword,
-        asignaturaId: asignatura.id,  // Asignación automática de la asignatura
-        usuarioId: 1,  // Este valor debe corresponder al ID de un usuario previamente creado
+        asignaturaId: asignatura.id, // Asignación automática de la asignatura
+        usuarioId: 1, // Este valor debe corresponder al ID de un usuario previamente creado
       },
     });
 
     console.log("Estudiante registrado:", nuevoEstudiante);
-    return { status: 200, message: 'Estudiante registrado exitosamente' };
-
+    return { status: 200, message: "Estudiante registrado exitosamente" };
   } catch (error) {
-    console.error('Error registrando el estudiante:', error);
-    return { status: 500, message: 'Error interno del servidor' };
+    console.error("Error registrando el estudiante:", error);
+    return { status: 500, message: "Error interno del servidor" };
   }
 });
