@@ -3,7 +3,7 @@ export default defineNuxtConfig({
   compatibilityDate: "2024-11-01",
   devtools: { enabled: true },
   features: {
-    devLogs: false // Reducir logs en producción
+    devLogs: false, // Reducir logs en producción
   },
   ssr: false,
   css: ["~/assets/css/main.css"],
@@ -12,6 +12,11 @@ export default defineNuxtConfig({
       "@prisma/nuxt",
       {
         studio: false, // Desactivar Prisma Studio en desarrollo
+        client: {
+          // Configuración optimizada
+          autoRegister: false,
+          prismaPath: "node_modules/.prisma/client",
+        },
       },
     ],
     [
@@ -47,13 +52,13 @@ export default defineNuxtConfig({
   app: {
     head: {
       link: [
-        { 
-          rel: 'preload', 
-          href: '/_nuxt/@nuxt/ui-templates/dist/templates.min.css',
-          as: 'style'
-        }
-      ]
-    }
+        {
+          rel: "preload",
+          href: "/_nuxt/@nuxt/ui-templates/dist/templates.min.css",
+          as: "style",
+        },
+      ],
+    },
   },
   colorMode: {
     preference: "system",
