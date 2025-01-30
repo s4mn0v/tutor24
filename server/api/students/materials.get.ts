@@ -1,30 +1,42 @@
 // server/api/students/materials.get.ts
 import { PrismaClient } from "@prisma/client";
 import { defineEventHandler, createError } from "h3";
+import { analyzeDocument } from "../../utils/geminiAI";
 
 const prisma = new PrismaClient();
 
 export default defineEventHandler(async (event) => {
   try {
     const materials = await prisma.material.findMany({
-      where: {
-        /* Add appropriate filter if needed */
-      },
       select: {
         id: true,
-        nombre: true, // Corregido a 'nombre'
-        tipo: true, // Corregido a 'tipo'
+        nombre: true,
+        tipo: true,
         creadoEn: true,
         url: true,
       },
+      where: {
+        tipo: {
+          in: [
+            'application/pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+          ]
+        }
+      }
     });
-    return materials.map((material) => ({
-      id: material.id,
-      nombre: material.nombre, // Corregido a 'nombre'
-      tipo: material.tipo, // Corregido a 'tipo'
-      creadoEn: material.creadoEn.toISOString(),
-      url: material.url,
+
+    const analyzedMaterials = await Promise.all(materials.map(async (material) => {
+      const topics = await analyzeDocument(material.url, material.tipo);
+      return {
+        ...material,
+        creadoEn: material.creadoEn.toISOString(),
+        topics,
+      };
     }));
+
+    return analyzedMaterials;
   } catch (error) {
     console.error("Error al obtener materiales:", error);
     throw createError({
