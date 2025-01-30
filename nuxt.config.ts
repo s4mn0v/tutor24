@@ -2,14 +2,36 @@ import { theme } from "#tailwind-config";
 export default defineNuxtConfig({
   compatibilityDate: "2024-11-01",
   devtools: { enabled: true },
+  features: {
+    devLogs: false // Reducir logs en producción
+  },
   ssr: false,
   css: ["~/assets/css/main.css"],
   modules: [
-    "@prisma/nuxt",
-    "@nuxt/ui",
+    [
+      "@prisma/nuxt",
+      {
+        studio: false, // Desactivar Prisma Studio en desarrollo
+      },
+    ],
+    [
+      "@nuxt/ui",
+      {
+        global: true,
+        icons: ["heroicons"],
+        safelist: [], // Limitar clases generadas
+        prefix: "U", // Mejorar tree-shaking
+      },
+    ],
     "@nuxtjs/tailwindcss",
   ],
-
+  components: [
+    {
+      path: "~/components",
+      pathPrefix: false, // Mejor organización según docs
+      extensions: [".vue"], // Limitar a extensiones necesarias
+    },
+  ],
   postcss: {
     plugins: {
       tailwindcss: {},
@@ -24,8 +46,14 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      link: [{ rel: "icon", type: "image/x-icon", href: "/favicon.ico" }],
-    },
+      link: [
+        { 
+          rel: 'preload', 
+          href: '/_nuxt/@nuxt/ui-templates/dist/templates.min.css',
+          as: 'style'
+        }
+      ]
+    }
   },
   colorMode: {
     preference: "system",
@@ -34,17 +62,20 @@ export default defineNuxtConfig({
   // Optimizaciones de vite
   vite: {
     build: {
-      cssMinify: true,
+      cssMinify: "lightningcss",
       minify: "terser",
       terserOptions: {
         compress: {
           drop_console: process.env.NODE_ENV === "production",
           drop_debugger: process.env.NODE_ENV === "production",
         },
+        format: {
+          comments: false, // Eliminar todos los comentarios
+        },
       },
     },
     optimizeDeps: {
-      include: ["vue", "vue-router", "@google/generative-ai"],
+      include: ["vue", "vue-router", "@google/generative-ai", "jwt-decode"],
     },
     // Layout no jode con esto
     css: {
@@ -53,12 +84,22 @@ export default defineNuxtConfig({
   },
   // Configurar la carga perezosa de imágenes
   experimental: {
+    asyncEntry: true, // Habilitar carga async
+    componentIslands: true, // Islands architecture
     viewTransition: true,
     renderJsonPayloads: false,
     clientFallback: true,
   },
   nitro: {
-    compressPublicAssets: true,
+    compressPublicAssets: {
+      gzip: true,
+      brotli: true,
+    },
+    prerender: {
+      crawlLinks: true,
+      routes: ["/"],
+    },
+    moduleSideEffects: [], // Mejorar tree-shaking
     minify: true,
     routeRules: {
       "/api/**": {
@@ -80,5 +121,10 @@ export default defineNuxtConfig({
   // Configuración adicional para Gemini
   build: {
     transpile: ["@google/generative-ai", "cookie"],
+  },
+  tailwindcss: {
+    configPath: "~/tailwind.config.ts",
+    exposeConfig: false, // Desactivar si no se necesita
+    viewer: false, // Desactivar en producción
   },
 });
