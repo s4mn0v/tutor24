@@ -62,7 +62,7 @@ export default defineNuxtConfig({
   // Optimizaciones de vite
   vite: {
     build: {
-      cssMinify: "lightningcss",
+      cssMinify: "esbuild",
       minify: "terser",
       terserOptions: {
         compress: {

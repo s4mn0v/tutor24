@@ -3,5 +3,8 @@
   "exclude": [
     "../components/teacher/RecordatorioCard.vue",
     "../components/teacher/RecordatoriosList.vue"
-  ]
+  ],
+  "compilerOptions": {
+    "types": ["@types/bcrypt", "@types/bcryptjs", "@types/jsonwebtoken"]
+  }
 }
