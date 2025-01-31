@@ -5,7 +5,7 @@
     <button
       @click="uploadFile"
       :disabled="!selectedFile"
-      class="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-300"
+      class="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-zinc-300"
     >
       Subir
     </button>

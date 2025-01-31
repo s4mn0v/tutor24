@@ -1,5 +1,5 @@
 <template>
-    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+    <div class="bg-white dark:bg-zinc-800 p-6 rounded-lg shadow-md">
       <!-- Formulario para crear asignaturas -->
       <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Crear Nueva Asignatura</h2>
       <UForm @submit="createSubject" class="space-y-4 mb-8">
