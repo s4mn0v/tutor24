@@ -1,14 +1,28 @@
 <!-- layouts/student.vue -->
 <template>
+  
   <div v-cloak>
     <nav class="shadow-md bg-white text-gray-800 dark:bg-zinc-900 dark:text-white">
+
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
         <div class="flex justify-between h-16">
+
           <!-- Logo -->
           <div class="flex items-center">
+            <Logo />
+            <div>
+              <p>
+                _____
+              </p>
+            </div>
             <NuxtLink to="/student" class="text-xl font-bold">
+
               <slot name="title">EstudianteAI</slot>
+              
             </NuxtLink>
+            
+            
           </div>
 
           <!-- Menu Items (Desktop) -->

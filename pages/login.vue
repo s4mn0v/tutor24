@@ -1,7 +1,9 @@
 <template>
   <div class="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
     <div class="max-w-md w-full space-y-8 bg-white dark:bg-gray-800 p-8 rounded-xl shadow-md">
+      
       <div class="flex justify-end">
+        <logo />
         <Theme />
       </div>
       <h2 class="text-center text-3xl font-extrabold text-gray-900 dark:text-white">

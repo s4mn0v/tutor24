@@ -5,8 +5,16 @@
         <div class="flex justify-between h-16">
           <!-- Logo -->
           <div class="flex items-center">
+            <Logo />
+            <div>
+              <p>
+                  
+                _____
+              </p>
+            </div>
             <NuxtLink to="/" class="text-xl font-bold">
-              <slot name="title">Pagina</slot>
+              <slot name="title">Admin</slot>
+              
             </NuxtLink>
           </div>
 
@@ -59,6 +67,8 @@
 </template>
 
 <script setup>
+import Logo from '~/components/logo.vue';
+
 // State to control mobile menu visibility
 const isMobileMenuOpen = ref(false);
 
