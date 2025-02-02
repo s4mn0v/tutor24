@@ -1,5 +1,5 @@
 <template>
-  <div class="calendar-container bg-gray-900 text-white p-4 sm:p-6">
+  <div class="calendar-container bg-zinc-900 text-white p-4 sm:p-6">
     <div class="flex flex-col lg:flex-row gap-6">
       <!-- Calendario -->
       <div class="flex-grow">
@@ -8,10 +8,10 @@
             {{ currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }) }}
           </h2>
           <div class="flex space-x-2">
-            <button @click="previousMonth" class="p-2 rounded-lg hover:bg-gray-700 transition-colors">
+            <button @click="previousMonth" class="p-2 rounded-lg hover:bg-zinc-700 transition-colors">
               <i class="fas fa-chevron-left"></i>
             </button>
-            <button @click="nextMonth" class="p-2 rounded-lg hover:bg-gray-700 transition-colors">
+            <button @click="nextMonth" class="p-2 rounded-lg hover:bg-zinc-700 transition-colors">
               <i class="fas fa-chevron-right"></i>
             </button>
           </div>
@@ -29,7 +29,7 @@
                class="aspect-square flex flex-col items-center justify-center text-xs sm:text-sm relative group rounded-lg"
                :class="[
                  isCurrentMonth ? 'text-white' : 'text-gray-500',
-                 'hover:bg-gray-700 transition-all duration-200'
+                 'hover:bg-zinc-700 transition-all duration-200'
                ]">
             <span :class="{ 'bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center': isToday(date) }">
               {{ date.getDate() }}
@@ -52,7 +52,7 @@
           <template v-if="eventos.length > 0">
             <div v-for="evento in eventos" 
                  :key="evento.id"
-                 class="bg-gray-800 rounded-lg p-3 hover:bg-gray-700 transition-all duration-200">
+                 class="bg-zinc-800 rounded-lg p-3 hover:bg-zinc-700 transition-all duration-200">
               <div class="flex justify-between items-start mb-2">
                 <div>
                   <p class="text-blue-400 text-xs sm:text-sm font-medium mb-1">

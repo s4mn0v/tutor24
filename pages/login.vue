@@ -15,35 +15,35 @@
           <div>
             <label for="email-address" class="sr-only">Correo electrónico</label>
             <input id="email-address" name="email" type="email" autocomplete="email" required
-              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm bg-white dark:bg-gray-700"
+              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm bg-white dark:bg-zinc-700"
               placeholder="Correo electrónico" v-model="email" />
           </div>
 
           <div v-if="isRegistering">
             <label for="documentoIdentidad" class="sr-only">Documento de Identidad</label>
             <input id="documentoIdentidad" name="documentoIdentidad" type="text" required
-              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700"
+              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-zinc-700"
               placeholder="Documento de Identidad" v-model="documentoIdentidad" />
           </div>
 
           <div v-if="isRegistering">
             <label for="nombre" class="sr-only">Nombre</label>
             <input id="nombre" name="nombre" type="text" required
-              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700"
+              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-zinc-700"
               placeholder="Nombre" v-model="nombre" />
           </div>
 
           <div v-if="isRegistering">
             <label for="telefono" class="sr-only">Teléfono</label>
             <input id="telefono" name="telefono" type="tel"
-              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700"
+              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-zinc-700"
               placeholder="Teléfono (opcional)" v-model="telefono" />
           </div>
 
           <div v-if="isRegistering">
             <label for="role" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Rol</label>
             <select id="role" name="role"
-              class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md bg-white dark:bg-zinc-700 text-gray-900 dark:text-white"
               v-model="role">
               <option value="ADMIN">Administrador</option>
               <option value="DOCENTE">Docente</option>
@@ -54,7 +54,7 @@
             <label for="password" class="sr-only">Contraseña</label>
             <input :type="showPassword ? 'text' : 'password'" id="password" name="password"
               autocomplete="current-password" required
-              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm bg-white dark:bg-gray-700"
+              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm bg-white dark:bg-zinc-700"
               placeholder="Contraseña" v-model="password" />
             <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5"
               @click="showPassword = !showPassword">

@@ -10,7 +10,7 @@
 
       <div v-if="asignaturas.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <UCard v-for="asignatura in asignaturas" :key="asignatura.id" 
-               class="bg-white/80 dark:bg-gray-800/80 hover:shadow-lg transition-shadow duration-300 cursor-pointer"
+               class="bg-white/80 dark:bg-zinc-800/80 hover:shadow-lg transition-shadow duration-300 cursor-pointer"
                @click="navigateToAsignatura(asignatura.id)">
           <template #header>
             <h3 class="text-lg sm:text-xl font-bold text-center text-blue-600 uppercase">{{ asignatura.nombre }}</h3>

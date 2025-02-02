@@ -1,9 +1,9 @@
 <!-- pages/student/content.vue -->
 <template>
-  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+  <div class="bg-white dark:bg-zinc-800 rounded-lg shadow-md p-6">
     <h2 class="text-2xl font-semibold mb-4 text-gray-800 dark:text-white">Contenido del Curso</h2>
     <div v-if="materials.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div v-for="material in materials" :key="material.id" class="mb-4 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">
+      <div v-for="material in materials" :key="material.id" class="mb-4 p-4 bg-zinc-100 dark:bg-zinc-700 rounded-lg">
         <h3 class="text-lg font-semibold text-gray-800 dark:text-white">{{ material.nombre }}</h3>
         <p class="text-sm text-gray-600 dark:text-gray-400">Tipo: {{ material.tipo }}</p>
         <div class="mt-2">

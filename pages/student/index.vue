@@ -1,6 +1,6 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
-    <div class="max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+  <div class="min-h-screen dark:bg-transparent p-4">
+    <div class="max-w-4xl mx-auto bg-white dark:bg-zinc-800 rounded-lg shadow-xl overflow-hidden">
       <div class="p-4 border-b dark:border-gray-700">
         <h1 class="text-xl font-semibold text-gray-800 dark:text-gray-200">
           Tu Asistente de Estudio Personal
@@ -23,7 +23,7 @@
             'rounded-lg p-4 max-w-[80%]',
             message.role === 'user' 
               ? 'bg-blue-100 dark:bg-blue-900 ml-auto' 
-              : 'bg-gray-100 dark:bg-gray-700'
+              : 'bg-zinc-100 dark:bg-zinc-700'
           ]">
             <div class="prose dark:prose-invert max-w-none"
                  v-html="sanitizeAndFormat(message.content)" />
@@ -58,7 +58,7 @@
                 <input
                   v-model="quizAnswer"
                   type="text"
-                  class="w-full p-2 rounded-lg border dark:border-gray-600 bg-white dark:bg-gray-700 
+                  class="w-full p-2 rounded-lg border dark:border-gray-600 bg-white dark:bg-zinc-700 
                          text-gray-900 dark:text-gray-100"
                   placeholder="Escribe tu respuesta (A, B, C o D)..."
                   maxlength="1"
@@ -88,13 +88,13 @@
       </div>
   
       <!-- Input Form -->
-      <div class="p-4 border-t dark:border-gray-700 bg-white dark:bg-gray-800">
+      <div class="p-4 border-t dark:border-zinc-700 bg-white dark:bg-zinc-800">
         <form @submit.prevent="sendMessage" class="flex gap-2">
           <input
             v-model="userInput"
             type="text"
             placeholder="Escribe tu mensaje aquí..."
-            class="flex-1 p-2 rounded-lg border dark:border-gray-600 bg-white dark:bg-gray-700 
+            class="flex-1 p-2 rounded-lg border dark:border-gray-600 bg-white dark:bg-zinc-700 
                    text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 
                    focus:border-transparent"
             :disabled="isLoading"
@@ -330,7 +330,7 @@ renderer.link = function({ href, title, text }: { href: string, title?: string |
   }
   
   .prose details {
-    @apply my-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-600;
+    @apply my-2 p-2 rounded-lg bg-zinc-50 dark:bg-zinc-600;
   }
   
   .prose summary {
@@ -354,11 +354,11 @@ renderer.link = function({ href, title, text }: { href: string, title?: string |
   }
   
   .prose pre {
-    @apply bg-gray-100 dark:bg-gray-700 p-4 rounded-lg overflow-x-auto my-2;
+    @apply bg-zinc-100 dark:bg-zinc-700 p-4 rounded-lg overflow-x-auto my-2;
   }
   
   .prose code {
-    @apply bg-gray-100 dark:bg-gray-700 px-1 rounded;
+    @apply bg-zinc-100 dark:bg-zinc-700 px-1 rounded;
   }
   
   .prose iframe {

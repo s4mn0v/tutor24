@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-screen bg-white dark:bg-transparent">
-    <div class="max-w-7xl mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+    <div class="max-w-7xl mx-auto bg-white dark:bg-zinc-800 rounded-xl shadow-lg overflow-hidden">
       <div class="flex flex-col lg:flex-row">
         <!-- Calendario -->
         <div class="w-full lg:w-2/3 p-4">
@@ -9,10 +9,10 @@
               {{ currentMonthName }} {{ currentYear }}
             </h2>
             <div class="flex space-x-2">
-              <button @click="previousMonth" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-900 transition-colors">
+              <button @click="previousMonth" class="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-900 transition-colors">
                 <i class="i-heroicons-chevron-left-20-solid w-5 h-5 text-gray-600 dark:text-gray-300"></i>
               </button>
-              <button @click="nextMonth" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+              <button @click="nextMonth" class="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
                 <i class="i-heroicons-chevron-right-20-solid w-5 h-5 text-gray-600 dark:text-gray-300"></i>
               </button>
             </div>
@@ -83,7 +83,7 @@
 
     <!-- Modal de Recordatorio -->
     <UModal v-model="showModal">
-      <div class="bg-white dark:bg-gray-800 rounded-lg p-6">
+      <div class="bg-white dark:bg-zinc-800 rounded-lg p-6">
         <h3 class="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Nuevo Recordatorio</h3>
         <form @submit.prevent="addReminder" class="space-y-4">
           <UFormGroup label="Título" name="title">
@@ -257,7 +257,7 @@ const reminderImportanceClass = (importance: string) => {
     case 'ALTA':
       return 'border-l-4 border-red-500 bg-red-50 dark:bg-red-900';
     default:
-      return 'border-l-4 border-gray-500 bg-gray-50 dark:bg-gray-800';
+      return 'border-l-4 border-gray-500 bg-zinc-50 dark:bg-zinc-800';
   }
 };
 
