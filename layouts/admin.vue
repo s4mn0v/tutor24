@@ -4,17 +4,10 @@
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
           <!-- Logo -->
-          <div class="flex items-center">
+          <div class="flex items-center space-x-8">
             <Logo />
-            <div>
-              <p>
-                  
-                _____
-              </p>
-            </div>
             <NuxtLink to="/" class="text-xl font-bold">
-              <slot name="title">Admin</slot>
-              
+              <slot name="title">Administrador</slot>
             </NuxtLink>
           </div>
 
@@ -25,7 +18,7 @@
               to="/admin">Inicio</NuxtLink>
             <NuxtLink
               class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-              to="/admin/docentes">Docentes</NuxtLink>
+              to="/admin/docentes">Docente</NuxtLink>
           </div>
 
           <!-- Dark Mode Toggle Button -->
