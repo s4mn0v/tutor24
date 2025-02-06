@@ -4,7 +4,7 @@
     <header class="bg-white dark:bg-zinc-800 shadow-sm">
       <div class="container mx-auto px-4 py-6">
         <h1 class="text-4xl font-bold text-zinc-900 dark:text-white">
-          Noticias de Inteligencia Artificial para Estudiantes
+          Noticias de Inteligencia Artificial para Docentes
         </h1>
         <p class="mt-2 text-zinc-600 dark:text-zinc-300">
           Mantente actualizado con las últimas noticias y avances en IA relevantes para tu educación
