@@ -37,6 +37,8 @@ yarn dev
 # bun
 bun run dev
 ```
+## Architecture system
+
 ```mermaid
 graph TB
     %% External Users
