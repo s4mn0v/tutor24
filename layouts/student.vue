@@ -1,28 +1,14 @@
-<!-- layouts/student.vue -->
 <template>
-  
   <div v-cloak>
     <nav class="shadow-md bg-white text-gray-800 dark:bg-zinc-900 dark:text-white">
-
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
         <div class="flex justify-between h-16">
-
           <!-- Logo -->
-          <div class="flex items-center">
-            <Logo />
-            <div>
-              <p>
-                _____
-              </p>
-            </div>
+          <div class="flex items-center space-x-8">
+            <Logo /> 
             <NuxtLink to="/student" class="text-xl font-bold">
-
               <slot name="title">EstudianteAI</slot>
-              
             </NuxtLink>
-            
-            
           </div>
 
           <!-- Menu Items (Desktop) -->
@@ -30,6 +16,9 @@
             <NuxtLink
               class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
               to="/student">Inicio</NuxtLink>
+            <NuxtLink
+              class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+              to="/student/chat">Asistente IA</NuxtLink>
             <NuxtLink
               class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
               to="/student/content">Contenido</NuxtLink>
@@ -65,6 +54,9 @@
             to="/student">Inicio</NuxtLink>
           <NuxtLink
             class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+            to="/student/chat">Asistente IA</NuxtLink>
+          <NuxtLink
+            class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
             to="/student/content">Contenido</NuxtLink>
           <NuxtLink
             class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
@@ -80,6 +72,8 @@
 </template>
 
 <script setup>
+import { ref } from 'vue';
+
 // State to control mobile menu visibility
 const isMobileMenuOpen = ref(false);
 

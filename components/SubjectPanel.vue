@@ -9,16 +9,18 @@
       </div>
 
       <div v-if="asignaturas.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        <UCard v-for="asignatura in asignaturas" :key="asignatura.id" 
-               class="bg-white/80 dark:bg-zinc-800/80 hover:shadow-lg transition-shadow duration-300 cursor-pointer"
-               @click="navigateToAsignatura(asignatura.id)">
+        <UCard v-for="asignatura in asignaturas" :key="asignatura.id"
+          class="bg-white/80 dark:bg-gray-800/80 hover:shadow-lg transition-shadow duration-300 cursor-pointer"
+          @click="navigateToAsignatura(asignatura.id)">
           <template #header>
             <h3 class="text-lg sm:text-xl font-bold text-center text-blue-600 uppercase">{{ asignatura.nombre }}</h3>
           </template>
           <div class="p-4">
             <p class="text-sm text-gray-600 dark:text-gray-300"><strong>Carrera:</strong> {{ asignatura.carrera }}</p>
             <p class="text-sm text-gray-600 dark:text-gray-300"><strong>Jornada:</strong> {{ asignatura.jornada }}</p>
-            <p class="text-sm text-gray-600 dark:text-gray-300"><strong>Inscritos:</strong> {{ asignatura.estudiantes?.length || 0 }}</p>
+            <p class="text-sm text-gray-600 dark:text-gray-300"><strong>Inscritos:</strong> {{
+              asignatura.estudiantes?.length || 0
+            }}</p>
             <p v-if="asignatura.enlaceRegistro" class="text-sm text-gray-600 dark:text-gray-300 mt-2">
               <strong>Enlace de registro:</strong>
               <UBadge color="blue" class="ml-2 cursor-pointer" @click.stop="copyLink(asignatura.enlaceRegistro)">
@@ -93,7 +95,7 @@ interface Asignatura {
   enlaceRegistro?: string | null;
   fechaExpiracion?: Date | null;
   estudiantes?: { id: number }[];
-  materiales?: {id: number}[];
+  materiales?: { id: number }[];
 }
 
 const router = useRouter();
@@ -110,7 +112,14 @@ const formState = reactive({
 
 const fetchAsignaturas = async () => {
   try {
-    const response = await $fetch<Asignatura[]>('/api/asignaturas');
+    const token = localStorage.getItem('token'); // Obtener el token almacenado
+    if (!token) throw new Error("No autenticado");
+
+    const response = await $fetch<Asignatura[]>('/api/asignaturas', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
     asignaturas.value = response;
     console.log('Asignaturas obtenidas:', asignaturas.value);
   } catch (error) {
@@ -118,6 +127,7 @@ const fetchAsignaturas = async () => {
     toast.add({ title: 'Error al cargar las asignaturas', color: 'red' });
   }
 };
+
 
 const createSubject = async () => {
   if (!formState.nombre || !formState.carrera || !formState.jornada) {
@@ -128,13 +138,26 @@ const createSubject = async () => {
   loading.value = true;
 
   try {
+    const token = localStorage.getItem('token'); // Obtener token almacenado
+    if (!token) throw new Error('No autenticado');
+
+    console.log("Datos a enviar:", {
+      nombre: formState.nombre,
+      carrera: formState.carrera,
+      jornada: formState.jornada,
+    });
+
     const newAsignatura = await $fetch<Asignatura>('/api/asignaturas/create', {
       method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`, // Incluir el token en el header
+        'Content-Type': 'application/json'
+      },
       body: {
         nombre: formState.nombre,
         carrera: formState.carrera,
         jornada: formState.jornada,
-        idDocente: 1, // Esto debería ser dinámico basado en el docente autenticado
+        // No se envía idDocente porque se obtiene del token en el backend
       },
     });
 
@@ -148,7 +171,10 @@ const createSubject = async () => {
     }
   } catch (error) {
     console.error('Error creando la asignatura:', error);
-    toast.add({ title: 'Hubo un error al crear la asignatura', color: 'red' });
+    toast.add({
+      title: error instanceof Error ? error.message : 'Hubo un error al crear la asignatura',
+      color: 'red'
+    });
   } finally {
     loading.value = false;
   }
@@ -176,7 +202,7 @@ const deleteSubject = async (id: number) => {
       await $fetch(`/api/asignaturas/${id}`, {
         method: 'DELETE'
       });
-      
+
       toast.add({ title: 'Asignatura eliminada exitosamente', color: 'green' });
       await fetchAsignaturas();
     } catch (error) {
@@ -204,4 +230,3 @@ onMounted(() => {
   fetchAsignaturas();
 });
 </script>
-

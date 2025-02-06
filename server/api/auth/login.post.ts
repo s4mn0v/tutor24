@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
         process.env.JWT_SECRET || "fallback_secret",
         { expiresIn: "1h" }
       );
-      return { token, role: usuario.rol };
+      return { token, role: usuario.rol, userId: usuario.id }; // Devuelve el userId
     }
 
     // Check in Estudiante table
@@ -51,6 +51,7 @@ export default defineEventHandler(async (event) => {
       select: {
         id: true,
         contrasena: true,
+        asignaturaId: true,
       },
     });
 
@@ -66,11 +67,11 @@ export default defineEventHandler(async (event) => {
         });
       }
       const token = jwt.sign(
-        { userId: estudiante.id, role: "ESTUDIANTE" },
+        { userId: estudiante.id, role: "ESTUDIANTE", asignaturaId: estudiante.asignaturaId },
         process.env.JWT_SECRET || "fallback_secret",
         { expiresIn: "1h" }
       );
-      return { token, role: "ESTUDIANTE" };
+      return { token, role: "ESTUDIANTE", asignaturaId: estudiante.asignaturaId, userId: estudiante.id }; // Devuelve el userId
     }
 
     return createError({

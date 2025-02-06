@@ -116,6 +116,8 @@ export default defineNuxtConfig({
           "Access-Control-Allow-Headers": "*",
         },
       },
+      // Student
+      "/api/news": { swr: 1800 },
     },
   },
   // Añadir configuración de TypeScript

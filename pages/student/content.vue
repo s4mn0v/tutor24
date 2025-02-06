@@ -7,7 +7,8 @@
         <h3 class="text-lg font-semibold text-gray-800 dark:text-white">{{ material.nombre }}</h3>
         <p class="text-sm text-gray-600 dark:text-gray-400">Tipo: {{ material.tipo }}</p>
         <div class="mt-2">
-          <a :href="material.url" target="_blank" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200">Ver en línea</a>
+          <a :href="material.url" target="_blank"
+            class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200">Ver en línea</a>
         </div>
         <div v-if="material.topics && material.topics.length > 0" class="mt-4">
           <h4 class="text-md font-semibold text-gray-700 dark:text-gray-300">Temas principales:</h4>
@@ -29,25 +30,37 @@
 import { ref, onMounted } from 'vue'
 
 interface Material {
-  id: number
-  nombre: string
-  tipo: string
-  url: string
-  topics: string[]
+  id: number;
+  nombre: string;
+  tipo: string;
+  url: string;
+  topics: string[];
 }
 
-const materials = ref<Material[]>([])
+const materials = ref<Material[]>([]);
 
 const fetchMaterials = async () => {
   try {
-    const response = await $fetch<Material[]>('/api/students/materials')
-    materials.value = response
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      console.error('No hay sesión activa');
+      return;
+    }
+
+    const response = await $fetch<Material[]>('/api/students/materials', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    materials.value = response;
   } catch (error) {
-    console.error('Error al obtener materiales:', error)
+    console.error('Error:', error);
   }
-}
+};
 
 onMounted(() => {
-  fetchMaterials()
-})
+  fetchMaterials();
+});
 </script>
