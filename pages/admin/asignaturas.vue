@@ -1,12 +1,12 @@
 <template>
   <div>
-    <!-- Grid responsivo: 1 columna en móvil y 3 columnas en md+ -->
+    <!-- Distribución con grid: la columna de las tarjetas ocupa 2/3 y la del gráfico 1/3 -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <!-- Estadísticas ocupan 2 de las 3 columnas -->
+      <!-- Tarjetas de estadísticas (2 columnas) -->
       <div class="md:col-span-2">
         <EstadisticaAsignaturas />
       </div>
-      <!-- El gráfico ocupa 1 columna -->
+      <!-- Gráfico (1 columna) -->
       <div class="md:col-span-1">
         <StatisticsChart />
       </div>

@@ -1,6 +1,6 @@
 <template>
   <div>
-    <!-- Si usas SSR y tienes problemas, puedes envolver el componente en <client-only> -->
+    <!-- Si es necesario, envolver en <client-only> para evitar problemas en SSR -->
     <ApexChart type="bar" :options="chartOptions" :series="series" />
   </div>
 </template>
@@ -8,7 +8,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 
-// Datos para la serie del gráfico
 const series = ref([
   {
     name: 'Valores',
@@ -16,17 +15,23 @@ const series = ref([
   },
 ]);
 
-// Opciones de configuración del gráfico
 const chartOptions = ref({
   chart: {
     id: 'stats-chart',
   },
   xaxis: {
-    // Etiquetas para cada dato: asignaturas, estudiantes y promedio
-    categories: ['Asignaturas', 'Estudiantes', 'Promedio'],
+    // Definimos 6 categorías para nuestro gráfico
+    categories: [
+      'Asignaturas totales',
+      'Estudiantes totales',
+      'Promedio de estudiantes',
+      'Asignaturas activas',
+      'Asignaturas inactivas',
+      'Materiales por asignatura'
+    ],
   },
   title: {
-    text: 'Estadísticas de asignaturas y estudiantes',
+    text: 'Estadísticas Generales',
   },
   plotOptions: {
     bar: {
@@ -35,23 +40,33 @@ const chartOptions = ref({
   },
 });
 
-// Función para obtener datos desde tus endpoints
 const fetchChartStats = async () => {
   try {
-    const [subjectsRes, studentsRes, averageRes] = await Promise.all([
+    // Se ejecutan en paralelo todas las peticiones
+    const [
+      subjectsRes,
+      studentsRes,
+      averageStudentsRes,
+      activeInactiveRes,
+      averageMaterialsRes
+    ] = await Promise.all([
       $fetch('/api/stats/subjects/count'),
       $fetch('/api/stats/students/count'),
       $fetch('/api/stats/students/average'),
+      $fetch('/api/stats/asignaturas/active-inactive'),
+      $fetch('/api/stats/materials/average'),
     ]);
 
-    // Actualiza la serie con los datos obtenidos
     series.value = [
       {
         name: 'Valores',
         data: [
-          subjectsRes.count,
-          studentsRes.count,
-          Number(averageRes.average),
+          subjectsRes.count,                             // Asignaturas totales
+          studentsRes.count,                             // Estudiantes totales
+          Number(averageStudentsRes.average),            // Promedio de estudiantes
+          activeInactiveRes.active,                      // Asignaturas activas
+          activeInactiveRes.inactive,                    // Asignaturas inactivas
+          Number(averageMaterialsRes.averageMaterials)   // Promedio de materiales por asignatura
         ],
       },
     ];
@@ -60,6 +75,5 @@ const fetchChartStats = async () => {
   }
 };
 
-// Cargar datos al montar el componente
 onMounted(fetchChartStats);
 </script>
