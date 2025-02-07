@@ -1,7 +1,7 @@
 <template>
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
     <!-- Tarjeta de Asignaturas Totales -->
-    <UCard>
+    <UCard class="bg-gradient-to-br from-blue-200 to-blue-400 dark:from-zinc-800 dark:to-zinc-900 shadow-md rounded-md">
       <template #header>
         <div class="flex items-center gap-2">
           <UIcon name="i-heroicons-book-open" class="text-primary text-xl" />
@@ -15,7 +15,7 @@
     </UCard>
 
     <!-- Tarjeta de Estudiantes Totales -->
-    <UCard>
+    <UCard class="bg-gradient-to-br from-blue-200 to-blue-400 dark:from-zinc-800 dark:to-zinc-900 shadow-md rounded-md">
       <template #header>
         <div class="flex items-center gap-2">
           <UIcon name="i-heroicons-user-group" class="text-green-500 text-xl" />
@@ -29,7 +29,7 @@
     </UCard>
 
     <!-- Tarjeta de Promedio de Estudiantes por Asignatura -->
-    <UCard>
+    <UCard class="bg-gradient-to-br from-blue-200 to-blue-400 dark:from-zinc-800 dark:to-zinc-900 shadow-md rounded-md">
       <template #header>
         <div class="flex items-center gap-2">
           <UIcon name="i-heroicons-chart-bar" class="text-purple-500 text-xl" />
@@ -43,10 +43,9 @@
     </UCard>
 
     <!-- Tarjeta de Asignaturas Activas -->
-    <UCard>
+    <UCard class="bg-gradient-to-br from-blue-200 to-blue-400 dark:from-zinc-800 dark:to-zinc-900 shadow-md rounded-md">
       <template #header>
         <div class="flex items-center gap-2">
-          <!-- Puedes cambiar el icono según tu preferencia -->
           <UIcon name="i-heroicons-check-circle" class="text-green-500 text-xl" />
           <h3 class="font-semibold">Asignaturas Activas</h3>
         </div>
@@ -58,10 +57,9 @@
     </UCard>
 
     <!-- Tarjeta de Asignaturas Inactivas -->
-    <UCard>
+    <UCard class="bg-gradient-to-br from-blue-200 to-blue-400 dark:from-zinc-800 dark:to-zinc-900 shadow-md rounded-md">
       <template #header>
         <div class="flex items-center gap-2">
-          <!-- Puedes cambiar el icono según tu preferencia -->
           <UIcon name="i-heroicons-x-circle" class="text-red-500 text-xl" />
           <h3 class="font-semibold">Asignaturas Inactivas</h3>
         </div>
@@ -73,10 +71,9 @@
     </UCard>
 
     <!-- Tarjeta de Promedio de Materiales por Asignatura -->
-    <UCard>
+    <UCard class="bg-gradient-to-br from-blue-200 to-blue-400 dark:from-zinc-800 dark:to-zinc-900 shadow-md rounded-md">
       <template #header>
         <div class="flex items-center gap-2">
-          <!-- Puedes cambiar el icono según tu preferencia -->
           <UIcon name="i-heroicons-document-text" class="text-blue-500 text-xl" />
           <h3 class="font-semibold">Prom. de Materiales</h3>
         </div>
