@@ -108,7 +108,20 @@ interface ApiResponse {
 
 const fetchEvents = async () => {
   try {
-    const response = await $fetch<ApiResponse>('/api/students/calendar');
+    // Recuperar el token del almacenamiento (o desde tu store de autenticación)
+    const token = localStorage.getItem("token");
+    if (!token) {
+      console.error("Token no encontrado");
+      return;
+    }
+
+    // Incluir la cabecera de autorización en la petición
+    const response = await $fetch<ApiResponse>('/api/students/calendar', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
     if (response && Array.isArray(response.eventos)) {
       eventos.value = response.eventos;
     }
