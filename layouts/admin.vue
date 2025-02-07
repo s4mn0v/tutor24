@@ -19,6 +19,9 @@
             <NuxtLink
               class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
               to="/admin/docentes">Docente</NuxtLink>
+            <NuxtLink
+              class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+              to="/admin/asignaturas">Asignaturas</NuxtLink>
           </div>
 
           <!-- Dark Mode Toggle Button -->
@@ -49,6 +52,9 @@
           <NuxtLink
             class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
             to="/admin/docentes">Docentes</NuxtLink>
+          <NuxtLink
+            class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+            to="/admin/asignaturas">Asignaturas</NuxtLink>
         </div>
       </div>
     </nav>
