@@ -30,11 +30,11 @@ model Estudiante {
   contrasena         String
   asignaturaId       Int
   usuarioId          Int
-  lastLoginDate      DateTime   @default(now())
-  streak             Int        @default(0)
   xp                 Int        @default(0)
+  streak             Int        @default(0)
+  lastLoginDate      DateTime   @default(now())
   asignatura         Asignatura @relation(fields: [asignaturaId], references: [id], onDelete: Cascade)
-  usuario            Usuario    @relation(fields: [usuarioId], references: [id])
+  usuario            Usuario    @relation(fields: [usuarioId], references: [id])
 }
 
 model Asignatura {
@@ -59,7 +59,7 @@ model Material {
   idAsignatura Int
   nombre       String
   tipo         String
-  url          String
+  url          String     // Ahora será la URL de Supabase
   asignatura   Asignatura @relation(fields: [idAsignatura], references: [id], onDelete: Cascade)
 }
 
