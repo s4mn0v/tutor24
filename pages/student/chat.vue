@@ -1,31 +1,31 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-2 md:p-4">
-    <div class="max-w-full md:max-w-6xl mx-auto">
-      <div class="grid grid-cols-1 md:grid-cols-[300px,1fr] gap-4 bg-gray-800/30 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-700/50">
+  <div class="h-screen p-2 md:p-4">
+    <div class="max-w-full md:max-w-6xl mx-auto h-full bg-gradient-to-br from-gray-100 via-gray-200 to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div class="grid grid-cols-1 md:grid-cols-[300px,1fr] gap-4 bg-white/70 dark:bg-gray-800/30 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 h-full">
         <!-- Panel Lateral -->
-        <div class="p-6 border-r border-gray-700/50">
+        <div class="p-6 border-r border-gray-200/50 dark:border-gray-700/50">
           <!-- Perfil y Nivel -->
           <div class="text-center mb-8">
             <div class="relative inline-block">
               <div class="w-20 h-20 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-2xl font-bold text-white mb-2">
                 {{ getInitials(studentName || 'Estudiante') }}
               </div>
-              <div class="absolute -bottom-2 -right-2 bg-yellow-500 rounded-full w-8 h-8 flex items-center justify-center text-gray-900 font-bold text-sm border-2 border-gray-800">
+              <div class="absolute -bottom-2 -right-2 bg-yellow-500 rounded-full w-8 h-8 flex items-center justify-center text-gray-900 font-bold text-sm border-2 border-gray-300 dark:border-gray-800">
                 {{ studentLevel }}
               </div>
             </div>
-            <h2 class="text-white font-medium mt-4">{{ studentName || 'Estudiante' }}</h2>
+            <h2 class="text-gray-900 dark:text-white font-medium mt-4">{{ studentName || 'Estudiante' }}</h2>
           </div>
 
           <!-- Progreso General -->
           <div class="mb-8">
             <div class="flex justify-between items-center mb-2">
-              <h3 class="text-white font-medium">Progreso General</h3>
+              <h3 class="text-gray-900 dark:text-white font-medium">Progreso General</h3>
               <span class="text-blue-400 font-medium">{{ Math.round(overallProgress) }}%</span>
             </div>
-            <div class="w-full h-3 bg-gray-700 rounded-full overflow-hidden">
+            <div class="w-full h-3 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">
               <div 
-                class="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500 ease-out"
+                class="h-full bg-gradient-to-r from-blue-400 to-purple-400 dark:from-blue-500 dark:to-purple-500 transition-all duration-500 ease-out"
                 :style="{ width: `${overallProgress}%` }"
               ></div>
             </div>
@@ -33,36 +33,35 @@
 
           <!-- Documentos y Temas -->
           <div class="space-y-4 mb-8">
-            <h3 class="text-white font-medium mb-4">Material de Estudio</h3>
+            <h3 class="text-gray-900 dark:text-white font-medium mb-4">Material de Estudio</h3>
             <div v-if="documents && documents.length > 0" class="space-y-2">
               <div v-for="doc in documents" 
                    :key="doc.id" 
-                   class="rounded-lg overflow-hidden">
+                   class="rounded-lg">
                 <!-- Título del Documento -->
                 <div 
                   @click="doc.isExpanded = !doc.isExpanded"
-                  class="flex items-center justify-between p-3 bg-gray-800/50 cursor-pointer hover:bg-gray-700/50 transition-all"
+                  class="flex items-center justify-between p-3 bg-gray-100/50 dark:bg-gray-800/50 cursor-pointer hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-all"
                 >
                   <div class="flex items-center gap-2">
                     <span class="text-blue-400">
                       📄
                     </span>
-                    <span class="text-gray-200">{{ formatDocumentTitle(doc.title) }}</span>
+                    <span class="text-gray-900 dark:text-gray-200">{{ formatDocumentTitle(doc.title) }}</span>
                   </div>
-                  <span class="text-gray-400 transform transition-transform" 
+                  <span class="text-gray-500 dark:text-gray-400 transform transition-transform" 
                         :class="doc.isExpanded ? 'rotate-180' : ''">
                     ▼
                   </span>
                 </div>
                 
                 <!-- Temas del Documento -->
-                <div v-if="doc.isExpanded" 
-                     class="bg-gray-900/30">
+                <div v-if="doc.isExpanded" class="bg-white/30 dark:bg-gray-900/30">
                   <div 
                     v-for="topic in doc.topics" 
                     :key="`${doc.id}-${topic}`"
                     @click="selectTopic(topic)"
-                    class="p-3 text-gray-300 hover:text-white hover:bg-gray-700/30 cursor-pointer transition-all flex items-center gap-2 group border-t border-gray-800/50"
+                    class="p-3 text-gray-800 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200/30 dark:hover:bg-gray-700/30 cursor-pointer transition-all flex items-center gap-2 group border-t border-gray-200/50 dark:border-gray-800/50"
                   >
                     <div class="w-2 h-2 rounded-full"
                          :class="[
@@ -79,43 +78,42 @@
                 </div>
               </div>
             </div>
-            <div v-else class="text-gray-400 text-center p-4 bg-gray-800/50 rounded-lg">
+            <div v-else class="text-gray-800 dark:text-gray-400 text-center p-4 bg-gray-100/50 dark:bg-gray-800/50 rounded-lg">
               No hay materiales disponibles
             </div>
           </div>
         </div>
 
         <!-- Área Principal -->
-        <div class="flex flex-col">
+        <div class="flex flex-col h-[calc(100vh-50px)]">
           <!-- Header -->
-          <div class="p-4 md:p-6 border-b border-gray-700/50">
+          <div class="p-4 md:p-6 border-b border-gray-200/50 dark:border-gray-700/50">
             <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
               <div>
-                <h1 class="text-xl md:text-2xl font-bold text-white mb-1">
+                <h1 class="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-1">
                   Tu Asistente de Aprendizaje Inteligente
                 </h1>
-                <div v-if="currentTopic" class="flex items-center gap-2 text-gray-400">
+                <div v-if="currentTopic" class="flex items-center gap-2 text-gray-700 dark:text-gray-400">
                   <span class="w-2 h-2 rounded-full bg-green-500"></span>
                   Estudiando: {{ currentTopic }}
                 </div>
               </div>
               <!-- Tiempo Conectado y XP -->
-              <div class="flex items-center gap-3 bg-gray-700/30 px-4 py-2 rounded-lg border border-gray-600/30">
+              <div class="flex items-center gap-3 bg-gray-200/30 dark:bg-gray-700/30 px-4 py-2 rounded-lg border border-gray-300/30 dark:border-gray-600/30">
                 <div class="flex items-center gap-1">
                   <span class="text-blue-400">⏱️</span>
-                  <span class="text-white font-medium">{{ formatConnectedTime }}</span>
-                  <span class="text-gray-400 text-sm">conectado</span>
+                  <span class="text-gray-900 dark:text-white font-medium">{{ formatConnectedTime }}</span>
+                  <span class="text-gray-700 dark:text-gray-400 text-sm">conectado</span>
                 </div>
-                <div class="h-4 w-px bg-gray-600"></div>
+                <div class="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
                 <div class="group relative">
                   <div class="flex items-center gap-1">
                     <span class="text-purple-400">⭐</span>
-                    <span class="text-white font-medium">{{ xp }}</span>
-                    <span class="text-gray-400 text-sm">XP</span>
+                    <span class="text-gray-900 dark:text-white font-medium">{{ xp }}</span>
+                    <span class="text-gray-700 dark:text-gray-400 text-sm">XP</span>
                   </div>
                   <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 
-                              opacity-0 group-hover:opacity-100 transition-opacity
-                              bg-gray-800 text-white text-sm px-3 py-1 rounded-lg whitespace-nowrap">
+                              opacity-0 group-hover:opacity-100 transition-opacity bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white text-sm px-3 py-1 rounded-lg whitespace-nowrap">
                     Gana XP respondiendo correctamente
                   </div>
                 </div>
@@ -135,8 +133,8 @@
               <div :class="[
                 'rounded-2xl p-4 max-w-[80%] shadow-lg',
                 message.role === 'user' 
-                  ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white ml-auto' 
-                  : 'bg-gray-700/50 backdrop-blur-sm text-gray-100'
+                  ? 'bg-gradient-to-br from-blue-400 to-blue-500 dark:from-blue-600 dark:to-blue-700 text-black dark:text-red-600 ml-auto' 
+                  : 'bg-zinc-900/50 dark:bg-gray-700/50 backdrop-blur-sm text-black dark:text-red-600'
               ]">
                 <div class="prose prose-invert max-w-none">
                   <div v-html="sanitizeAndFormat(message.content)"></div>
@@ -144,19 +142,16 @@
                 </div>
                 <!-- Quiz Interface -->
                 <div v-if="message.quiz" class="mt-4 space-y-4">
-                  <div class="p-6 bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50">
+                  <div class="p-6 bg-gray-100/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-300/50 dark:border-gray-700/50">
                     <p class="font-medium text-lg mb-6">{{ message.quiz.question }}</p>
                     <div class="space-y-3">
                       <button
                         v-for="(option, index) in message.quiz.options" 
                         :key="index" 
-                        class="w-full text-left p-4 rounded-xl border border-gray-600/50
-                               bg-gray-700/30 hover:bg-gray-700/50 hover:border-blue-500/50
-                               transition-all duration-300 flex items-center space-x-4"
+                        class="w-full text-left p-4 rounded-xl border border-gray-300/50 dark:border-gray-600/50 bg-gray-100/30 dark:bg-gray-700/30 hover:bg-gray-200/30 dark:hover:bg-gray-700/50 hover:border-blue-500/50 transition-all duration-300 flex items-center space-x-4"
                         @click="selectAnswer(String.fromCharCode(65 + index))"
                       >
-                        <span class="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-800/50 
-                                   flex items-center justify-center font-medium text-blue-400">
+                        <span class="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-100/50 dark:bg-gray-800/50 flex items-center justify-center font-medium text-blue-400">
                           {{ String.fromCharCode(65 + index) }}
                         </span>
                         <span class="flex-1">{{ option }}</span>
@@ -170,8 +165,8 @@
                      :class="[
                        'mt-4 p-4 rounded-xl border',
                        message.answerFeedback.isCorrect 
-                         ? 'bg-green-900/30 border-green-500/30 text-green-100' 
-                         : 'bg-red-900/30 border-red-500/30 text-red-100'
+                         ? 'bg-green-100/30 border-green-300/30 text-green-900 dark:bg-green-900/30 dark:border-green-500/30 dark:text-green-100' 
+                         : 'bg-red-100/30 border-red-300/30 text-red-900 dark:bg-red-900/30 dark:border-red-500/30 dark:text-red-100'
                      ]">
                   <div class="flex items-start gap-3">
                     <div :class="[
@@ -196,24 +191,19 @@
           </div>
 
           <!-- Input Form -->
-          <div class="p-4 border-t border-gray-700/50 bg-gray-800/30 backdrop-blur-sm">
+          <div class="p-4 border-t border-gray-200/50 dark:border-gray-700/50 bg-gray-100/30 dark:bg-gray-800/30 backdrop-blur-sm">
             <form @submit.prevent="sendMessage" class="flex gap-3">
               <input
                 v-model="userInput"
                 type="text"
                 placeholder="Escribe tu mensaje aquí..."
-                class="flex-1 p-4 rounded-xl border border-gray-600/50 bg-gray-700/30 
-                       text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500/50 
-                       focus:border-blue-500/50 transition-all duration-300"
+                class="flex-1 p-4 rounded-xl border border-gray-300/50 dark:border-gray-600/50 bg-gray-100 text-gray-900 dark:bg-gray-700/30 dark:text-gray-100 placeholder-gray-600 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300"
                 :disabled="isLoading"
               />
               <button
                 type="submit"
                 :disabled="isLoading"
-                class="px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl
-                       hover:from-blue-500 hover:to-blue-600 disabled:opacity-50 
-                       disabled:cursor-not-allowed transition-all duration-300
-                       flex items-center gap-2 font-medium shadow-lg shadow-blue-500/20"
+                class="px-6 py-4 bg-gradient-to-r from-blue-400 to-blue-500 dark:from-blue-600 dark:to-blue-700 text-white rounded-xl hover:from-blue-300 hover:to-blue-400 dark:hover:from-blue-500 dark:hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center gap-2 font-medium shadow-lg shadow-blue-500/20"
               >
                 <span v-if="isLoading">
                   <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">

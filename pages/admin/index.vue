@@ -1,12 +1,12 @@
 <template>
-  <div class="min-h-screen bg-gray-900">
+  <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
     <!-- Sección del Encabezado -->
-    <header class="bg-gray-800 shadow-sm">
+    <header class="bg-white dark:bg-gray-800 shadow-sm">
       <div class="container mx-auto px-4 py-6">
-        <h1 class="text-4xl font-bold text-white">
+        <h1 class="text-4xl font-bold text-gray-900 dark:text-white">
           Noticias de Inteligencia Artificial
         </h1>
-        <p class="mt-2 text-gray-300">
+        <p class="mt-2 text-gray-600 dark:text-gray-300">
           Mantente actualizado con las últimas noticias y avances en IA
         </p>
       </div>
@@ -16,30 +16,30 @@
     <main class="container mx-auto px-4 py-8">
       <!-- Sección de Estadísticas -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-gray-800 rounded-lg shadow-sm p-6">
-          <h3 class="text-lg font-semibold text-white mb-2">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             Noticias Totales
           </h3>
           <p class="text-3xl font-bold text-blue-500">{{ articles.length }}</p>
         </div>
-        <div class="bg-gray-800 rounded-lg shadow-sm p-6">
-          <h3 class="text-lg font-semibold text-white mb-2">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             Interacciones con Gemini
           </h3>
           <p class="text-3xl font-bold text-green-500">{{ geminiInteractions }}</p>
         </div>
-        <div class="bg-gray-800 rounded-lg shadow-sm p-6">
-          <h3 class="text-lg font-semibold text-white mb-2">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             Última Actualización
           </h3>
-          <p class="text-lg text-gray-300">
+          <p class="text-lg text-gray-600 dark:text-gray-300">
             {{ formatDate(lastUpdate) }}
           </p>
         </div>
       </div>
 
       <!-- Estado de Error -->
-      <div v-if="error" class="bg-red-500 text-white p-4 rounded-lg mb-8">
+      <div v-if="error" class="bg-red-100 dark:bg-red-500 text-gray-900 dark:text-white p-4 rounded-lg mb-8">
         {{ error }}
       </div>
 
@@ -50,13 +50,12 @@
 
       <!-- Cuadrícula de Noticias -->
       <div v-else-if="articles.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <div v-for="article in articles" :key="article.id" 
-             class="bg-gray-800 rounded-lg shadow-lg overflow-hidden transition-transform duration-300 ease-in-out transform hover:scale-105">
+        <div v-for="article in articles" :key="article.id"
+          class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden transition-transform duration-300 ease-in-out transform hover:scale-105">
           <div class="relative">
             <a :href="article.url" target="_blank" rel="noopener noreferrer">
-              <img :src="article.image" :alt="article.title" 
-                   class="w-full h-56 object-cover cursor-pointer"
-                   @error="handleImageError">
+              <img :src="article.image" :alt="article.title" class="w-full h-56 object-cover cursor-pointer"
+                @error="handleImageError">
             </a>
             <div class="absolute top-0 right-0 m-4">
               <span class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm">
@@ -65,20 +64,21 @@
             </div>
           </div>
           <div class="p-6">
-            <h2 class="text-xl font-semibold mb-3 text-white">
+            <h2 class="text-xl font-semibold mb-3 text-gray-900 dark:text-white">
               {{ article.title }}
             </h2>
-            <p class="text-gray-300 mb-4 text-base leading-relaxed">
+            <p class="text-base leading-relaxed mb-4 text-gray-600 dark:text-gray-300">
               {{ article.summary }}
             </p>
             <div class="flex justify-between items-center">
-              <span class="text-sm text-gray-400">
+              <span class="text-sm text-gray-600 dark:text-gray-400">
                 {{ formatDate(article.date) }}
               </span>
-              <button @click="showArticleDetails(article)" 
-                      class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition duration-300 ease-in-out flex items-center space-x-2">
+              <button @click="showArticleDetails(article)"
+                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition duration-300 ease-in-out flex items-center space-x-2">
                 <span>Más información</span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                 </svg>
               </button>
@@ -89,62 +89,60 @@
 
       <!-- Estado Vacío -->
       <div v-else class="text-center py-12">
-        <p class="text-gray-300 text-xl">No hay noticias disponibles en este momento.</p>
+        <p class="text-xl text-gray-600 dark:text-gray-300">No hay noticias disponibles en este momento.</p>
       </div>
 
       <!-- Modal de Artículo -->
-      <div v-if="selectedArticle" 
-           class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div class="bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div v-if="selectedArticle"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
           <div class="p-8">
             <div class="flex justify-between items-start mb-6">
-              <h2 class="text-3xl font-bold text-white">
+              <h2 class="text-3xl font-bold text-gray-900 dark:text-white">
                 {{ selectedArticle.title }}
               </h2>
-              <button @click="closeModal" 
-                      class="text-gray-400 hover:text-gray-200">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <button @click="closeModal" class="text-gray-400 hover:text-gray-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            
-            <img :src="selectedArticle.image" :alt="selectedArticle.title" 
-                 class="w-full h-80 object-cover mb-6 rounded-lg"
-                 @error="handleImageError">
+
+            <img :src="selectedArticle.image" :alt="selectedArticle.title"
+              class="w-full h-80 object-cover mb-6 rounded-lg" @error="handleImageError">
 
             <!-- Resumen de Gemini -->
-            <div class="bg-gray-700 rounded-lg p-6 mb-6">
-              <h3 class="text-xl font-semibold mb-4 text-white">
+            <div class="bg-white dark:bg-gray-700 rounded-lg p-6 mb-6">
+              <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
                 Resumen por IA
               </h3>
               <div v-if="geminiLoading" class="flex justify-center items-center h-20">
                 <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
               </div>
-              <div v-else-if="geminiSummary" class="text-gray-300 text-lg space-y-4">
-                <div class="prose prose-invert max-w-none whitespace-pre-line">
+              <div v-else-if="geminiSummary" class="text-lg space-y-4 text-gray-600 dark:text-gray-300">
+                <div class="prose dark:prose-invert max-w-none whitespace-pre-line">
                   {{ geminiSummary }}
                 </div>
               </div>
             </div>
 
             <!-- Chat con Gemini -->
-            <div class="bg-gray-700 rounded-lg p-6">
-              <h3 class="text-xl font-semibold mb-4 text-white">
+            <div class="bg-white dark:bg-gray-700 rounded-lg p-6">
+              <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
                 Consulta a Gemini sobre esta noticia
               </h3>
               <div class="mb-4">
-                <textarea v-model="userMessage" 
-                          class="w-full p-4 border rounded-md bg-gray-600 text-white text-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-                          placeholder="Haz cualquier pregunta sobre esta noticia..."
-                          rows="4"></textarea>
+                <textarea v-model="userMessage"
+                  class="w-full p-4 border rounded-md bg-gray-200 dark:bg-gray-600 text-lg text-gray-900 dark:text-white resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Haz cualquier pregunta sobre esta noticia..." rows="4"></textarea>
               </div>
               <div class="flex justify-end space-x-4">
-                <button @click="askGemini" 
-                        :disabled="!userMessage || geminiLoading"
-                        class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-md transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed text-lg flex items-center space-x-2">
+                <button @click="askGemini" :disabled="!userMessage || geminiLoading"
+                  class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-md transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed text-lg flex items-center space-x-2">
                   <span>{{ geminiLoading ? 'Procesando...' : 'Preguntar a Gemini' }}</span>
-                  <svg v-if="!geminiLoading" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg v-if="!geminiLoading" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
+                    viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7" />
                   </svg>
                   <div v-else class="animate-spin rounded-full h-5 w-5 border-2 border-white"></div>
@@ -152,25 +150,28 @@
               </div>
 
               <!-- Respuesta de Gemini -->
-              <div v-if="geminiResponse" class="mt-6 bg-gray-800 rounded-lg p-6 border border-gray-700">
+              <div v-if="geminiResponse"
+                class="mt-6 bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-300 dark:border-gray-700">
                 <div class="flex justify-between items-start mb-4">
                   <div class="flex items-center space-x-3">
                     <div class="bg-green-500 rounded-full p-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                       </svg>
                     </div>
-                    <h4 class="text-xl font-semibold text-white">Respuesta de Gemini</h4>
+                    <h4 class="text-xl font-semibold text-gray-900 dark:text-white">Respuesta de Gemini</h4>
                   </div>
-                  <button @click="closeGeminiResponse" 
-                          class="text-gray-400 hover:text-gray-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <button @click="closeGeminiResponse" class="text-gray-400 hover:text-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                      stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
                 <div class="prose dark:prose-invert max-w-none">
-                  <p class="text-gray-300 text-lg">{{ geminiResponse }}</p>
+                  <p class="text-lg text-gray-600 dark:text-gray-300">{{ geminiResponse }}</p>
                 </div>
               </div>
             </div>
@@ -186,43 +187,8 @@ import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import { useRuntimeConfig } from '#app';
 import { useNuxtApp } from '#imports'
-// import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const config = useRuntimeConfig();
-// const genAI = new GoogleGenerativeAI(config.geminiApiKey || "");
-
-// if (!config.geminiApiKey) {
-//   console.error('GEMINI_API_KEY no está configurada');
-// }
-
-// async function retryWithExponentialBackoff(fn: () => Promise<any>, maxRetries = 3) {
-//   for (let i = 0; i < maxRetries; i++) {
-//     try {
-//       return await fn();
-//     } catch (error: unknown) {
-//       if (i === maxRetries - 1) throw error;
-//       if (error instanceof Error && error.message.includes("429")) {
-//         const delay = Math.pow(2, i) * 1000;
-//         console.log(`Reintentando en ${delay}ms...`);
-//         await new Promise(resolve => setTimeout(resolve, delay));
-//       } else {
-//         throw error;
-//       }
-//     }
-//   }
-//   throw new Error("Max retries reached");
-// }
-
-// async function generateContentWithRetry(prompt: string): Promise<string> {
-//   return retryWithExponentialBackoff(async () => {
-//     if (!config.geminiApiKey) {
-//       throw new Error('API de Gemini no configurada');
-//     }
-//     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-//     const result = await model.generateContent(prompt);
-//     return result.response.text();
-//   });
-// }
 
 interface Article {
   id: number;
@@ -269,7 +235,7 @@ async function fetchLatestNews() {
   try {
     loading.value = true;
     error.value = '';
-    
+
     const response = await fetch('/api/news');
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -329,12 +295,12 @@ async function generateIntroduction(article: any): Promise<string> {
     }
     let introduction = await response.text();
     introduction = introduction.trim();
-    
+
     // Asegurarse de que la introducción termine con un punto si no lo hace ya
     if (!introduction.endsWith('.')) {
       introduction += '.';
     }
-    
+
     return introduction;
   } catch (error) {
     console.error("Error al generar introducción con Gemini:", error);
@@ -511,6 +477,7 @@ function closeGeminiResponse() {
     transform: translateY(10px);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -521,4 +488,3 @@ function closeGeminiResponse() {
   animation: slideIn 0.3s ease-out;
 }
 </style>
-
