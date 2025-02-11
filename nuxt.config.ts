@@ -44,9 +44,12 @@ export default defineNuxtConfig({
     },
   },
   runtimeConfig: {
+    jwtSecret: process.env.JWT_SECRET,
     geminiApiKey: process.env.GEMINI_API_KEY,
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || "/api",
+      supabaseUrl: process.env.SUPABASE_URL,
+      supabaseKey: process.env.SUPABASE_KEY
     },
   },
   app: {
