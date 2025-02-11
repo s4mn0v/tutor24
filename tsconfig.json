@@ -10,7 +10,7 @@
     "strict": true,
     "resolveJsonModule": true,
     "noImplicitAny": false,
-    "types": ["node", "bcrypt", "bcryptjs", "jsonwebtoken"],
+    "types": ["node", "bcrypt", "bcryptjs", "jsonwebtoken", "@prisma/client"],
     "typeRoots": [
       "./node_modules/@types"
     ]
