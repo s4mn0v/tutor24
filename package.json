@@ -4,9 +4,8 @@
   "type": "module",
   "scripts": {
     "build": "nuxt build",
-    "dev": "node --experimental-specifier-resolution=node node_modules/nuxt/bin/nuxt.mjs dev",
-    "start": "node .output/server/index.mjs",
-    "generate": "node_modules/.bin/nuxt generate",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "prisma:generate": "prisma generate",
@@ -53,7 +52,9 @@
     "uuid": "^11.0.5",
     "vue": "latest",
     "vue-router": "latest",
-    "vue3-apexcharts": "^1.8.0"
+    "vue3-apexcharts": "^1.8.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.8"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
