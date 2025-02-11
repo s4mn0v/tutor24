@@ -138,6 +138,12 @@ const nextMonth = () => {
   currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() + 1)
 }
 
+interface CalendarDay {
+  date: Date;
+  isCurrentMonth: boolean;
+  hasEvent: boolean;
+}
+
 const calendarDays = computed(() => {
   const year = currentDate.value.getFullYear()
   const month = currentDate.value.getMonth()
