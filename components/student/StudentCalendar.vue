@@ -24,18 +24,17 @@
         </div>
 
         <div class="grid grid-cols-7 gap-1">
-          <div v-for="{ date, isCurrentMonth, hasEvent } in calendarDays" 
-               :key="date.toISOString()"
-               class="aspect-square flex flex-col items-center justify-center text-xs sm:text-sm relative group rounded-lg"
-               :class="[
-                 isCurrentMonth ? 'text-white' : 'text-gray-500',
-                 'hover:bg-zinc-700 transition-all duration-200'
-               ]">
-            <span :class="{ 'bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center': isToday(date) }">
+          <div v-for="{ date, isCurrentMonth, hasEvent } in calendarDays" :key="date.toISOString()"
+            class="aspect-square flex flex-col items-center justify-center text-xs sm:text-sm relative group rounded-lg"
+            :class="[
+              isCurrentMonth ? 'text-white' : 'text-gray-500',
+              'hover:bg-zinc-700 transition-all duration-200'
+            ]">
+            <span
+              :class="{ 'bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center': isToday(date) }">
               {{ date.getDate() }}
             </span>
-            <div v-if="hasEvent" 
-                 class="w-1 h-1 bg-blue-400 rounded-full mt-1">
+            <div v-if="hasEvent" class="w-1 h-1 bg-blue-400 rounded-full mt-1">
             </div>
           </div>
         </div>
@@ -47,12 +46,11 @@
           <i class="fas fa-bell mr-2 text-blue-400"></i>
           Recordatorios
         </h3>
-        
+
         <div class="space-y-4 max-h-96 overflow-y-auto pr-2">
           <template v-if="eventos.length > 0">
-            <div v-for="evento in eventos" 
-                 :key="evento.id"
-                 class="bg-zinc-800 rounded-lg p-3 hover:bg-zinc-700 transition-all duration-200">
+            <div v-for="evento in eventos" :key="evento.id"
+              class="bg-zinc-800 rounded-lg p-3 hover:bg-zinc-700 transition-all duration-200">
               <div class="flex justify-between items-start mb-2">
                 <div>
                   <p class="text-blue-400 text-xs sm:text-sm font-medium mb-1">
@@ -144,37 +142,37 @@ interface CalendarDay {
   hasEvent: boolean;
 }
 
-const calendarDays = computed(() => {
-  const year = currentDate.value.getFullYear()
-  const month = currentDate.value.getMonth()
-  const firstDay = new Date(year, month, 1)
-  const lastDay = new Date(year, month + 1, 0)
-  const daysInMonth = lastDay.getDate()
-  const startingDayOfWeek = firstDay.getDay()
+const calendarDays = computed<CalendarDay[]>(() => {
+  const year = currentDate.value.getFullYear();
+  const month = currentDate.value.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startingDayOfWeek = firstDay.getDay();
 
-  const days = []
+  const days: CalendarDay[] = []; // 👈 Aseguramos que esto es un array de CalendarDay
 
   for (let i = 0; i < startingDayOfWeek; i++) {
-    const date = new Date(year, month, -startingDayOfWeek + i + 1)
-    days.push({ date, isCurrentMonth: false, hasEvent: hasEvent(date) })
+    const date = new Date(year, month, -startingDayOfWeek + i + 1);
+    days.push({ date, isCurrentMonth: false, hasEvent: hasEvent(date) });
   }
 
   for (let i = 1; i <= daysInMonth; i++) {
-    const date = new Date(year, month, i)
-    days.push({ date, isCurrentMonth: true, hasEvent: hasEvent(date) })
+    const date = new Date(year, month, i);
+    days.push({ date, isCurrentMonth: true, hasEvent: hasEvent(date) });
   }
 
-  const remainingDays = 42 - days.length
+  const remainingDays = 42 - days.length;
   for (let i = 1; i <= remainingDays; i++) {
-    const date = new Date(year, month + 1, i)
-    days.push({ date, isCurrentMonth: false, hasEvent: hasEvent(date) })
+    const date = new Date(year, month + 1, i);
+    days.push({ date, isCurrentMonth: false, hasEvent: hasEvent(date) });
   }
 
-  return days
-})
+  return days;
+});
 
 const hasEvent = (date: Date) => {
-  return eventos.value.some(evento => 
+  return eventos.value.some(evento =>
     new Date(evento.date).toDateString() === date.toDateString()
   )
 }
@@ -221,4 +219,3 @@ onMounted(fetchEvents)
   border-radius: 20px;
 }
 </style>
-

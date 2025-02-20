@@ -184,7 +184,7 @@ const calendarDays = computed(() => {
   const daysInMonth = lastDay.getDate();
   const startingDayOfWeek = firstDay.getDay();
 
-  const days = [];
+  const days: { date: Date; isCurrentMonth: boolean; isToday: boolean }[] = [];
 
   for (let i = 0; i < startingDayOfWeek; i++) {
     const date = new Date(year, month, -startingDayOfWeek + i + 1);

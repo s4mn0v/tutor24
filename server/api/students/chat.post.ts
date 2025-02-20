@@ -417,7 +417,7 @@ export default defineEventHandler(async (event: H3Event) => {
 
     let response = ""
     let quiz: any = null
-    let answerFeedback = null
+    let answerFeedback: { isCorrect: boolean; feedback: string; } | null = null;
     let xpGained = 0
     let newStreak = context.streak
     let videoEmbed = ""
@@ -517,7 +517,7 @@ Selecciona un tema del panel izquierdo para comenzar una sesión de estudio. Te 
       }
     } else if (answer && quiz) {
       const feedback = await checkQuizAnswer(quiz.questions[quiz.currentQuestion], answer)
-      answerFeedback = feedback
+      answerFeedback = feedback ?? null;
       response = feedback.feedback
 
       const progressUpdate = await updateStudentProgress(

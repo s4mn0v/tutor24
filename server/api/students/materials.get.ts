@@ -4,6 +4,14 @@ import { analyzeDocument } from "../../utils/geminiAI";
 import jwt from "jsonwebtoken";
 
 const prisma = new PrismaClient();
+interface AnalyzedMaterial {
+  id: number;
+  nombre: string;
+  tipo: string;
+  url: string;
+  creadoEn: string;
+  topics: string[];
+}
 
 export default defineEventHandler(async (event) => {
   try {
@@ -47,13 +55,17 @@ export default defineEventHandler(async (event) => {
     });
 
     // Procesar análisis (opcional)
-    const analyzedMaterials = await Promise.all(
-      materials.map(async (material) => ({
+    const analyzedMaterials: AnalyzedMaterial[] = [];
+    for (const material of materials) {
+      const topics = await analyzeDocument(material.url, material.tipo);
+      analyzedMaterials.push({
         ...material,
         creadoEn: material.creadoEn.toISOString(),
-        topics: await analyzeDocument(material.url, material.tipo),
-      }))
-    );
+        topics,
+      });
+      // Pausa opcional de 1 segundo entre solicitudes para darle un respiro a la API
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
 
     return analyzedMaterials;
   } catch (error) {
