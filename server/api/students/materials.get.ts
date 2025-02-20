@@ -1,17 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 import { defineEventHandler, createError, getRequestHeaders } from "h3";
-import { analyzeDocument } from "../../utils/geminiAI";
 import jwt from "jsonwebtoken";
 
 const prisma = new PrismaClient();
-interface AnalyzedMaterial {
-  id: number;
-  nombre: string;
-  tipo: string;
-  url: string;
-  creadoEn: string;
-  topics: string[];
-}
 
 export default defineEventHandler(async (event) => {
   try {
@@ -32,10 +23,10 @@ export default defineEventHandler(async (event) => {
       asignaturaId: number;
     };
 
-    // Obtener materiales de SU asignatura
+    // Obtener materiales de la asignatura del estudiante
     const materials = await prisma.material.findMany({
       where: {
-        idAsignatura: decoded.asignaturaId, // <-- Usamos el ID desde el token
+        idAsignatura: decoded.asignaturaId,
         tipo: {
           in: [
             "application/pdf",
@@ -54,20 +45,13 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    // Procesar análisis (opcional)
-    const analyzedMaterials: AnalyzedMaterial[] = [];
-    for (const material of materials) {
-      const topics = await analyzeDocument(material.url, material.tipo);
-      analyzedMaterials.push({
-        ...material,
-        creadoEn: material.creadoEn.toISOString(),
-        topics,
-      });
-      // Pausa opcional de 1 segundo entre solicitudes para darle un respiro a la API
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
+    // Procesar materiales sin análisis IA (no se agrega la propiedad "topics")
+    const processedMaterials = materials.map((material) => ({
+      ...material,
+      creadoEn: material.creadoEn.toISOString(),
+    }));
 
-    return analyzedMaterials;
+    return processedMaterials;
   } catch (error) {
     console.error("Error:", error);
     throw createError({
