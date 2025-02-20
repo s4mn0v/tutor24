@@ -69,6 +69,11 @@ export default defineNuxtConfig({
   },
   // Optimizaciones de vite
   vite: {
+    resolve: {
+      alias: {
+        '.prisma/client/index-browser': './node_modules/.prisma/client/index-browser.js'
+      }
+    },
     build: {
       cssMinify: "esbuild",
       minify: "terser",
