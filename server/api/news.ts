@@ -11,8 +11,9 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    // Cambiado pageSize de 12 a 3 para reducir las solicitudes
     const response = await fetch(
-      `https://newsapi.org/v2/everything?q=inteligencia artificial OR IA OR machine learning OR deep learning OR neural networks&language=es&sortBy=publishedAt&pageSize=12&apiKey=${newsApiKey}`,
+      `https://newsapi.org/v2/everything?q=inteligencia artificial OR IA OR machine learning OR deep learning OR neural networks&language=es&sortBy=publishedAt&pageSize=3&apiKey=${newsApiKey}`,
     )
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
@@ -26,4 +27,3 @@ export default defineEventHandler(async (event) => {
     })
   }
 })
-

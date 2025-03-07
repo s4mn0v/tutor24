@@ -121,8 +121,8 @@
               <div v-if="geminiLoading" class="flex justify-center items-center h-20">
                 <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
               </div>
-              <div v-else-if="geminiSummary" class="text-zinc-600 dark:text-gray-300 text-lg space-y-4">
-                <div class="prose prose-invert max-w-none whitespace-pre-line">
+              <div v-else-if="geminiSummary" class="text-zinc-900 dark:text-gray-300 text-lg space-y-4">
+                <div class="prose max-w-none whitespace-pre-line text-zinc-900 dark:text-gray-300">
                   {{ geminiSummary }}
                 </div>
               </div>
@@ -212,6 +212,9 @@ const loading = ref(true);
 const error = ref('');
 const lastUpdate = ref(new Date().toISOString());
 
+// Función para esperar un tiempo determinado (para reintentos)
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 onMounted(() => {
   // Solo cargar noticias si no están ya en el estado
   if (articles.value.length === 0) {
@@ -239,6 +242,10 @@ async function fetchLatestNews() {
     loading.value = true;
     error.value = '';
 
+    // Limpiar caché para forzar nueva carga
+    localStorage.removeItem('cachedNews');
+    localStorage.removeItem('cachedNewsTime');
+
     const response = await fetch('/api/news');
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -246,10 +253,14 @@ async function fetchLatestNews() {
     const data = await response.json();
 
     if (data.articles?.length > 0) {
-      articles.value = await Promise.all(data.articles.map(async (article: any, index: number) => ({
+      // Limitar explícitamente a 3 noticias
+      const limitedArticles = data.articles.slice(0, 3);
+
+      // Usar la descripción directamente en lugar de generar con Gemini
+      articles.value = limitedArticles.map((article: any, index: number) => ({
         id: index + 1,
         title: article.title || 'Sin título',
-        summary: await generateIntroduction(article),
+        summary: article.description || 'No hay descripción disponible',
         fullContent: article.content || article.description || 'Contenido no disponible',
         image: article.urlToImage || 'https://via.placeholder.com/800x400?text=IA+News',
         date: article.publishedAt || new Date().toISOString(),
@@ -257,7 +268,12 @@ async function fetchLatestNews() {
         url: article.url,
         description: article.description,
         content: article.content
-      })));
+      }));
+
+      // Guardar en caché
+      const now = new Date().getTime();
+      localStorage.setItem('cachedNews', JSON.stringify(articles.value));
+      localStorage.setItem('cachedNewsTime', now.toString());
     } else {
       error.value = 'No se encontraron noticias de IA. Mostrando contenido de respaldo.';
       useBackupNews();
@@ -270,43 +286,6 @@ async function fetchLatestNews() {
     useBackupNews();
   } finally {
     loading.value = false;
-  }
-}
-
-async function generateIntroduction(article: any): Promise<string> {
-  const prompt = `
-      Lee el siguiente artículo y genera una introducción clara y concisa de no más de 300 caracteres.
-      La introducción debe capturar la esencia del artículo y proporcionar una idea clara de lo que trata la noticia.
-      No uses puntos suspensivos (...) y asegúrate de que la idea esté completa.
-  
-      Título: ${article.title}
-      Contenido: ${article.content || article.description || 'No hay contenido disponible'}
-  
-      Introducción:
-    `;
-
-  try {
-    const response = await fetch('/api/gemini', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ prompt }),
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    let introduction = await response.text();
-    introduction = introduction.trim();
-
-    if (!introduction.endsWith('.')) {
-      introduction += '.';
-    }
-
-    return introduction;
-  } catch (error) {
-    console.error("Error al generar introducción con Gemini:", error);
-    return article.description || article.content?.substring(0, 300) || "No hay información disponible sobre esta noticia.";
   }
 }
 
@@ -352,9 +331,20 @@ async function showArticleDetails(article: Article) {
 
 async function getGeminiSummary(article: Article) {
   geminiLoading.value = true;
+
   try {
-    geminiSummary.value = await generateDetailedSummary(article);
-    geminiInteractions.value++;
+    // Verificar si ya existe un resumen en caché para este artículo
+    const cacheKey = `gemini_summary_${article.id}`;
+    const cachedSummary = localStorage.getItem(cacheKey);
+
+    if (cachedSummary) {
+      geminiSummary.value = cachedSummary;
+    } else {
+      geminiSummary.value = await generateDetailedSummary(article);
+      // Guardar en caché
+      localStorage.setItem(cacheKey, geminiSummary.value);
+      geminiInteractions.value++;
+    }
   } catch (error) {
     console.error('Error al obtener el resumen de Gemini:', error);
     geminiSummary.value = 'Lo sentimos, no se pudo generar el resumen en este momento. Por favor, intenta de nuevo más tarde.';
@@ -380,31 +370,61 @@ async function generateDetailedSummary(article: Article): Promise<string> {
       Resumen (máximo 15 líneas):
     `;
 
-  try {
-    const response = await fetch('/api/gemini', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ prompt }),
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+  let retries = 0;
+  const maxRetries = 3;
+  let delay = 1000; // 1 segundo inicial
+
+  while (retries < maxRetries) {
+    try {
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt }),
+      });
+
+      if (response.status === 429 && retries < maxRetries - 1) {
+        console.log(`Límite de cuota alcanzado. Reintentando en ${delay}ms...`);
+        await wait(delay);
+        retries++;
+        delay *= 2; // Espera exponencial
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const text = await response.text();
+      return text.trim();
+    } catch (error) {
+      console.error("Error al generar resumen con Gemini:", error);
+      retries++;
+
+      if (retries >= maxRetries) {
+        throw new Error("No se pudo generar el resumen. Por favor, intenta de nuevo más tarde.");
+      }
+
+      await wait(delay);
+      delay *= 2; // Espera exponencial
     }
-    const text = await response.text();
-    return text.trim();
-  } catch (error) {
-    console.error("Error al generar resumen con Gemini:", error);
-    throw new Error("No se pudo generar el resumen. Por favor, intenta de nuevo más tarde.");
   }
+
+  throw new Error("No se pudo generar el resumen después de varios intentos.");
 }
 
 async function askGemini() {
   if (!userMessage.value || !selectedArticle.value) return;
 
   geminiLoading.value = true;
-  try {
-    const prompt = `
+  let retries = 0;
+  const maxRetries = 3;
+  let delay = 1000; // 1 segundo inicial
+
+  while (retries < maxRetries) {
+    try {
+      const prompt = `
         Contexto: Estás analizando un artículo sobre inteligencia artificial con el siguiente título y contenido:
   
         Título: ${selectedArticle.value.title}
@@ -421,25 +441,46 @@ async function askGemini() {
   
         Respuesta:
       `;
-    const response = await fetch('/api/gemini', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ prompt }),
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt }),
+      });
+
+      if (response.status === 429 && retries < maxRetries - 1) {
+        console.log(`Límite de cuota alcanzado. Reintentando en ${delay}ms...`);
+        await wait(delay);
+        retries++;
+        delay *= 2; // Espera exponencial
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      geminiResponse.value = await response.text();
+      geminiInteractions.value++;
+      userMessage.value = '';
+      break; // Salir del bucle si la solicitud fue exitosa
+
+    } catch (error) {
+      console.error('Error al consultar a Gemini:', error);
+      retries++;
+
+      if (retries >= maxRetries) {
+        geminiResponse.value = "Error al procesar la pregunta. Por favor, intenta de nuevo más tarde.";
+        break;
+      }
+
+      await wait(delay);
+      delay *= 2; // Espera exponencial
     }
-    geminiResponse.value = await response.text();
-    geminiInteractions.value++;
-    userMessage.value = '';
-  } catch (error) {
-    console.error('Error al consultar a Gemini:', error);
-    geminiResponse.value = "Error al procesar la pregunta. Por favor, intenta de nuevo más tarde.";
-  } finally {
-    geminiLoading.value = false;
   }
+
+  geminiLoading.value = false;
 }
 
 function useBackupNews() {

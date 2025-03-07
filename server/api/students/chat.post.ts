@@ -1,11 +1,61 @@
 import { PrismaClient } from "@prisma/client"
-import { GoogleGenerativeAI } from "@google/generative-ai"
+import { GoogleGenerativeAI, type GenerativeModel } from "@google/generative-ai"
 import { type H3Event, createError, getRequestHeaders, readBody, defineEventHandler } from "h3"
 import jwt from "jsonwebtoken"
 import axios from "axios"
+import * as dotenv from 'dotenv'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
+import fs from 'fs'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
+// Configuración para cargar variables de entorno
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const rootDir = join(__dirname, '..', '..', '..')
+
+// Cargar variables de entorno desde .env
+const envPath = join(rootDir, '.env')
+if (fs.existsSync(envPath)) {
+  console.log('Cargando variables de entorno desde:', envPath)
+  dotenv.config({ path: envPath })
+} else {
+  console.warn('Archivo .env no encontrado en:', envPath)
+  // Intentar cargar desde la raíz del proyecto
+  dotenv.config()
+}
+
+// Obtener variables de entorno directamente
+const GEMINI_API_KEY = process.env.NUXT_GEMINI_API_KEY || process.env.GEMINI_API_KEY
+const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret"
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY
+
+// Verificar variables críticas
+if (!GEMINI_API_KEY) {
+  console.error('ADVERTENCIA: GEMINI_API_KEY no está definida')
+}
+
 const prisma = new PrismaClient()
+
+// Inicializar Gemini con la API key si está disponible
+let genAI: GoogleGenerativeAI | null = null
+if (GEMINI_API_KEY) {
+  genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
+}
+
+// Función para obtener una instancia del modelo
+function getGeminiModel(): GenerativeModel {
+  if (!genAI) {
+    throw new Error("Gemini API no está inicializada")
+  }
+  return genAI.getGenerativeModel({ 
+    model: "gemini-1.5-pro", // Cambiado de "gemini-pro" a "gemini-1.5-pro"
+    generationConfig: {
+      temperature: 0.7,
+      topP: 0.8,
+      topK: 40
+    }
+  })
+}
 
 interface StudentContext {
   messages: string[]
@@ -105,9 +155,62 @@ async function retryWithExponentialBackoff<T>(
   throw new Error(`Operation failed after ${maxRetries} retries`)
 }
 
+function generateDefaultTopics(nombre: string): string[] {
+  return [
+    "Introducción a " + nombre,
+    "Conceptos básicos de " + nombre,
+    "Aplicaciones prácticas",
+    "Ejemplos y casos de estudio",
+    "Conclusiones y resumen",
+  ]
+}
+
+// Función de respuesta fallback cuando Gemini no está disponible
+function getFallbackResponse(prompt: string, asignaturaNombre: string): string {
+  if (prompt === "inicio") {
+    return `👋 ¡Bienvenido a tu asistente personal de estudio para ${asignaturaNombre}!
+
+⚠️ NOTA: El sistema está funcionando en modo limitado porque la API key de Gemini no está configurada.
+
+Para habilitar todas las funcionalidades, por favor configura la variable de entorno GEMINI_API_KEY.
+
+Mientras tanto, puedes explorar los materiales disponibles y revisar tus temas de estudio.`
+  }
+  
+  if (prompt.startsWith("STUDY_TOPIC:")) {
+    const topic = prompt.replace("STUDY_TOPIC:", "").trim()
+    return `Has seleccionado el tema: ${topic}
+
+⚠️ NOTA: El contenido personalizado no está disponible porque la API key de Gemini no está configurada.
+
+Para habilitar todas las funcionalidades, por favor configura la variable de entorno GEMINI_API_KEY.`
+  }
+  
+  if (prompt.toLowerCase().includes("quiz") || prompt.toLowerCase().includes("evaluar")) {
+    return `Lo siento, la función de quiz no está disponible en este momento porque la API key de Gemini no está configurada.
+
+Para habilitar todas las funcionalidades, por favor configura la variable de entorno GEMINI_API_KEY.`
+  }
+  
+  return `Lo siento, no puedo generar una respuesta personalizada en este momento porque la API key de Gemini no está configurada.
+
+Para habilitar todas las funcionalidades, por favor configura la variable de entorno GEMINI_API_KEY.`
+}
+
 async function generateFinalQuiz(topic: string, concepts: string[], examples: string[]) {
+  if (!genAI) {
+    return [
+      {
+        question: "Pregunta de ejemplo (Gemini API no disponible)",
+        options: ["A) Opción 1", "B) Opción 2", "C) Opción 3", "D) Opción 4"],
+        correctAnswer: "A",
+        explanation: "Esta es una pregunta de ejemplo. Configura la API key de Gemini para obtener preguntas personalizadas."
+      }
+    ]
+  }
+  
   return retryWithExponentialBackoff(async () => {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+    const model = getGeminiModel()
     const prompt = `
       Como profesor experto, genera 4 preguntas diferentes para evaluar el aprendizaje sobre: ${topic}
 
@@ -139,47 +242,61 @@ async function generateFinalQuiz(topic: string, concepts: string[], examples: st
 }
 
 async function analyzeDocument(nombre: string, contenido: string): Promise<{ title: string; topics: string[] }> {
-  return retryWithExponentialBackoff(async () => {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" })
-    const prompt = `
-      Analiza el siguiente documento y genera una lista de temas principales que se cubren en él.
-      Si el contenido no es claro o está vacío, genera temas específicos basados en el título del documento.
-
-      Título del documento: "${nombre}"
-      Contenido del documento: "${contenido}"
-
-      Instrucciones:
-      1. Identifica los conceptos clave y temas principales del documento
-      2. Si el contenido está vacío, infiere temas específicos basados en el título
-      3. Genera exactamente 5 temas principales y específicos
-      4. Asegúrate de que los temas sean relevantes para el estudio y aprendizaje
-
-      Responde SOLO con una lista de 5 temas específicos, uno por línea, sin numeración ni puntos.
-    `
-    const result = await model.generateContent(prompt)
-    const text = result.response.text().trim()
-    const topics = text.split("\n").filter((topic) => topic.trim() !== "")
-
+  if (!genAI) {
     return {
       title: nombre,
-      topics: topics.length === 5 ? topics : generateDefaultTopics(nombre),
+      topics: generateDefaultTopics(nombre)
     }
-  })
-}
+  }
+  
+  try {
+    return await retryWithExponentialBackoff(async () => {
+      const model = getGeminiModel()
+      const prompt = `
+        Analiza el siguiente documento y genera una lista de temas principales que se cubren en él.
+        Si el contenido no es claro o está vacío, genera temas específicos basados en el título del documento.
 
-function generateDefaultTopics(nombre: string): string[] {
-  return [
-    "Introducción a " + nombre,
-    "Conceptos básicos de " + nombre,
-    "Aplicaciones prácticas",
-    "Ejemplos y casos de estudio",
-    "Conclusiones y resumen",
-  ]
+        Título del documento: "${nombre}"
+        Contenido del documento: "${contenido}"
+
+        Instrucciones:
+        1. Identifica los conceptos clave y temas principales del documento
+        2. Si el contenido está vacío, infiere temas específicos basados en el título
+        3. Genera exactamente 5 temas principales y específicos
+        4. Asegúrate de que los temas sean relevantes para el estudio y aprendizaje
+
+        Responde SOLO con una lista de 5 temas específicos, uno por línea, sin numeración ni puntos.
+      `
+      const result = await model.generateContent(prompt)
+      const text = result.response.text().trim()
+      const topics = text.split("\n").filter((topic) => topic.trim() !== "")
+
+      return {
+        title: nombre,
+        topics: topics.length === 5 ? topics : generateDefaultTopics(nombre),
+      }
+    })
+  } catch (error) {
+    console.error(`Error analizando material (usando temas predeterminados):`, error)
+    return {
+      title: nombre,
+      topics: generateDefaultTopics(nombre)
+    }
+  }
 }
 
 async function generateQuiz(topic: string, context: string, materials: Material[]) {
+  if (!genAI) {
+    return {
+      question: "Pregunta de ejemplo (Gemini API no disponible)",
+      options: ["A) Opción 1", "B) Opción 2", "C) Opción 3", "D) Opción 4"],
+      correctAnswer: "A",
+      explanation: "Esta es una pregunta de ejemplo. Configura la API key de Gemini para obtener preguntas personalizadas."
+    }
+  }
+  
   return retryWithExponentialBackoff(async () => {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+    const model = getGeminiModel()
     const prompt = `
     Como profesor experto, genera una pregunta de evaluación sobre ${topic}.
     
@@ -219,8 +336,12 @@ async function checkQuizAnswer(quiz: any, userAnswer: string) {
 }
 
 async function detectCurrentTopic(messages: string[], context = "") {
+  if (!genAI) {
+    return "Tema general"
+  }
+  
   return retryWithExponentialBackoff(async () => {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+    const model = getGeminiModel()
     const prompt = `
       Analiza esta conversación y contexto:
       
@@ -289,7 +410,17 @@ async function getMaterialesActualizados(asignaturaId: number): Promise<Material
       creadoEn: true,
       idAsignatura: true,
     },
+    // Limitar a 3 materiales para reducir solicitudes a Gemini
+    take: 3
   })
+
+  // Si Gemini no está disponible, usar temas predeterminados
+  if (!genAI) {
+    return materials.map(material => ({
+      ...material,
+      topics: generateDefaultTopics(material.nombre)
+    }))
+  }
 
   const analyzedMaterials = await Promise.all(
     materials.map(async (material) => {
@@ -313,8 +444,16 @@ async function getMaterialesActualizados(asignaturaId: number): Promise<Material
 }
 
 async function selectTopic(topic: string, contenido: string) {
+  if (!genAI) {
+    return `Has seleccionado el tema: ${topic}
+
+Lo siento, no puedo generar contenido personalizado porque la API key de Gemini no está configurada.
+
+Para habilitar todas las funcionalidades, por favor configura la variable de entorno GEMINI_API_KEY.`
+  }
+  
   return retryWithExponentialBackoff(async () => {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+    const model = getGeminiModel()
     const prompt = `
       Eres un tutor experto en el tema "${topic}".
       
@@ -342,13 +481,18 @@ async function selectTopic(topic: string, contenido: string) {
 
 async function getRelatedVideo(topic: string): Promise<string> {
   try {
+    if (!YOUTUBE_API_KEY) {
+      console.warn("YOUTUBE_API_KEY no está definida. No se pueden obtener videos relacionados.")
+      return ""
+    }
+    
     const response = await axios.get(`https://www.googleapis.com/youtube/v3/search`, {
       params: {
         part: "snippet",
         q: topic + " educativo",
         type: "video",
         maxResults: 1,
-        key: process.env.YOUTUBE_API_KEY,
+        key: YOUTUBE_API_KEY,
         relevanceLanguage: "es",
       },
     })
@@ -367,6 +511,14 @@ async function getRelatedVideo(topic: string): Promise<string> {
 
 export default defineEventHandler(async (event: H3Event) => {
   try {
+    // Verificar si Gemini está disponible
+    const geminiAvailable = !!genAI
+    
+    // Si Gemini no está disponible, mostrar advertencia pero continuar
+    if (!geminiAvailable) {
+      console.warn("Funcionando en modo limitado: GEMINI_API_KEY no está definida")
+    }
+
     const headers = getRequestHeaders(event)
     const token = headers.authorization?.split(" ")[1]
 
@@ -379,9 +531,10 @@ export default defineEventHandler(async (event: H3Event) => {
 
     let decoded
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || "fallback_secret") as {
+      decoded = jwt.verify(token, JWT_SECRET) as {
         userId: number
         asignaturaId: number
+        type?: string
       }
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
@@ -391,6 +544,14 @@ export default defineEventHandler(async (event: H3Event) => {
         })
       }
       throw error
+    }
+
+    // Si el token es de tipo refresh, rechazar la solicitud
+    if (decoded.type === "refresh") {
+      throw createError({
+        statusCode: 401,
+        message: "Tipo de token inválido",
+      })
     }
 
     const estudiante = await prisma.estudiante.findFirst({
@@ -427,8 +588,18 @@ export default defineEventHandler(async (event: H3Event) => {
     context.conversationHistory = context.conversationHistory.slice(-19)
     context.conversationHistory.push(`Usuario: ${message}`)
 
-    if (message === "inicio") {
-      response = `👋 ¡Bienvenido a tu asistente personal de estudio para ${estudiante.asignatura.nombre}!
+    // Si Gemini no está disponible, usar respuestas predefinidas
+    if (!geminiAvailable) {
+      response = getFallbackResponse(message, estudiante.asignatura.nombre)
+      
+      if (message.startsWith("STUDY_TOPIC:")) {
+        const selectedTopic = message.replace("STUDY_TOPIC:", "").trim()
+        context.currentTopic = selectedTopic
+      }
+    } else {
+      // Gemini está disponible, usar la funcionalidad completa
+      if (message === "inicio") {
+        response = `👋 ¡Bienvenido a tu asistente personal de estudio para ${estudiante.asignatura.nombre}!
 
 Estoy aquí para ayudarte a prepararte para tus exámenes y evaluaciones. Podemos:
 
@@ -440,123 +611,124 @@ Estoy aquí para ayudarte a prepararte para tus exámenes y evaluaciones. Podemo
 Selecciona un tema del panel izquierdo para comenzar una sesión de estudio. Te guiaré paso a paso y al final evaluaremos tu comprensión con un quiz personalizado.
 
 ¿Listo para empezar? 💪`
-    } else if (message.startsWith("STUDY_TOPIC:")) {
-      const selectedTopic = message.replace("STUDY_TOPIC:", "").trim()
-      context.currentTopic = selectedTopic
+      } else if (message.startsWith("STUDY_TOPIC:")) {
+        const selectedTopic = message.replace("STUDY_TOPIC:", "").trim()
+        context.currentTopic = selectedTopic
 
-      // Buscar el documento que contiene el tema seleccionado
-      const relevantDocument = materials.find((doc) =>
-        doc.topics?.some((topic) => topic.toLowerCase() === selectedTopic.toLowerCase()),
-      )
-
-      if (relevantDocument) {
-        response = await selectTopic(selectedTopic, relevantDocument.nombre)
-
-        context.studySession = {
-          topic: selectedTopic,
-          startTime: new Date(),
-          concepts: [],
-          examples: [],
-        }
-
-        // Extraer conceptos y ejemplos de la respuesta
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" })
-        const conceptsPrompt = `
-          Extrae los conceptos clave mencionados en esta explicación:
-          ${response}
-          
-          Responde solo con la lista de conceptos, uno por línea.
-        `
-        const conceptsResult = await model.generateContent(conceptsPrompt)
-        context.studySession.concepts = conceptsResult.response.text().split("\n")
-
-        const examplesPrompt = `
-          Extrae los ejemplos mencionados en esta explicación:
-          ${response}
-          
-          Responde solo con la lista de ejemplos, uno por línea.
-        `
-        const examplesResult = await model.generateContent(examplesPrompt)
-        context.studySession.examples = examplesResult.response.text().split("\n")
-
-        // Obtener video relacionado
-        videoEmbed = await getRelatedVideo(selectedTopic)
-        if (videoEmbed) {
-          response += "\n\nAquí tienes un video relacionado con el tema:\n" + videoEmbed
-        }
-      } else {
-        // Si no se encuentra un documento relevante, generar una respuesta basada en el tema
-        response = await selectTopic(selectedTopic, "")
-      }
-    } else if (message.toLowerCase().includes("video") || message.toLowerCase().includes("repasar")) {
-      if (context.currentTopic) {
-        videoEmbed = await getRelatedVideo(context.currentTopic)
-        if (videoEmbed) {
-          response = `Aquí tienes un video para repasar el tema "${context.currentTopic}":\n${videoEmbed}`
-        } else {
-          response = `Lo siento, no pude encontrar un video adecuado para el tema "${context.currentTopic}".`
-        }
-      } else {
-        response = "Primero necesitamos seleccionar un tema antes de buscar un video. ¿Qué tema te gustaría estudiar?"
-      }
-    } else if (message.toLowerCase().includes("quiz") || message.toLowerCase().includes("evaluar")) {
-      if (context.studySession) {
-        const questions = await generateFinalQuiz(
-          context.studySession.topic,
-          context.studySession.concepts,
-          context.studySession.examples,
+        // Buscar el documento que contiene el tema seleccionado
+        const relevantDocument = materials.find((doc) =>
+          doc.topics?.some((topic) => topic.toLowerCase() === selectedTopic.toLowerCase()),
         )
-        quiz = {
-          questions,
-          currentQuestion: 0,
+
+        if (relevantDocument) {
+          response = await selectTopic(selectedTopic, relevantDocument.nombre)
+
+          context.studySession = {
+            topic: selectedTopic,
+            startTime: new Date(),
+            concepts: [],
+            examples: [],
+          }
+
+          // Extraer conceptos y ejemplos de la respuesta
+          const model = getGeminiModel()
+          const conceptsPrompt = `
+            Extrae los conceptos clave mencionados en esta explicación:
+            ${response}
+            
+            Responde solo con la lista de conceptos, uno por línea.
+          `
+          const conceptsResult = await model.generateContent(conceptsPrompt)
+          context.studySession.concepts = conceptsResult.response.text().split("\n")
+
+          const examplesPrompt = `
+            Extrae los ejemplos mencionados en esta explicación:
+            ${response}
+            
+            Responde solo con la lista de ejemplos, uno por línea.
+          `
+          const examplesResult = await model.generateContent(examplesPrompt)
+          context.studySession.examples = examplesResult.response.text().split("\n")
+
+          // Obtener video relacionado
+          videoEmbed = await getRelatedVideo(selectedTopic)
+          if (videoEmbed) {
+            response += "\n\nAquí tienes un video relacionado con el tema:\n" + videoEmbed
+          }
+        } else {
+          // Si no se encuentra un documento relevante, generar una respuesta basada en el tema
+          response = await selectTopic(selectedTopic, "")
         }
-        response =
-          "¡Excelente sesión de estudio! Vamos a evaluar tu comprensión con estas preguntas. Responde con la letra de la opción que consideres correcta (A, B, C o D):"
+      } else if (message.toLowerCase().includes("video") || message.toLowerCase().includes("repasar")) {
+        if (context.currentTopic) {
+          videoEmbed = await getRelatedVideo(context.currentTopic)
+          if (videoEmbed) {
+            response = `Aquí tienes un video para repasar el tema "${context.currentTopic}":\n${videoEmbed}`
+          } else {
+            response = `Lo siento, no pude encontrar un video adecuado para el tema "${context.currentTopic}".`
+          }
+        } else {
+          response = "Primero necesitamos seleccionar un tema antes de buscar un video. ¿Qué tema te gustaría estudiar?"
+        }
+      } else if (message.toLowerCase().includes("quiz") || message.toLowerCase().includes("evaluar")) {
+        if (context.studySession) {
+          const questions = await generateFinalQuiz(
+            context.studySession.topic,
+            context.studySession.concepts,
+            context.studySession.examples,
+          )
+          quiz = {
+            questions,
+            currentQuestion: 0,
+          }
+          response =
+            "¡Excelente sesión de estudio! Vamos a evaluar tu comprensión con estas preguntas. Responde con la letra de la opción que consideres correcta (A, B, C o D):"
+        } else {
+          response = "Primero necesitamos estudiar un tema antes de hacer el quiz. ¿Qué tema te gustaría estudiar?"
+        }
+      } else if (answer && quiz) {
+        const feedback = await checkQuizAnswer(quiz.questions[quiz.currentQuestion], answer)
+        answerFeedback = feedback ?? null;
+        response = feedback.feedback
+
+        const progressUpdate = await updateStudentProgress(
+          decoded.userId,
+          context.currentTopic || "Tema general",
+          feedback.isCorrect,
+        )
+        xpGained = progressUpdate.xpGained
+        newStreak = progressUpdate.newStreak
+        quiz.currentQuestion++
+        if (quiz.currentQuestion >= quiz.questions.length) {
+          quiz = null
+        }
       } else {
-        response = "Primero necesitamos estudiar un tema antes de hacer el quiz. ¿Qué tema te gustaría estudiar?"
-      }
-    } else if (answer && quiz) {
-      const feedback = await checkQuizAnswer(quiz.questions[quiz.currentQuestion], answer)
-      answerFeedback = feedback ?? null;
-      response = feedback.feedback
+        const model = getGeminiModel()
+        const prompt = `
+          Eres un tutor virtual especializado en ${estudiante.asignatura.nombre}.
+          
+          Contexto actual:
+          - Tema: ${context.currentTopic || "General"}
+          - Últimos mensajes: ${context.messages.slice(-3).join("\n")}
+          
+          Mensaje del estudiante: "${message}"
+          
+          Instrucciones:
+          1. Responde de manera clara y didáctica
+          2. Si el estudiante hace una pregunta, explica con ejemplos
+          3. Si detectas confusión, ofrece una explicación alternativa
+          4. Mantén un tono motivador y positivo
+          
+          NO menciones el quiz final.
+          Enfócate en ayudar al estudiante a comprender el tema.
+        `
+        const result = await model.generateContent(prompt)
+        response = result.response.text()
 
-      const progressUpdate = await updateStudentProgress(
-        decoded.userId,
-        context.currentTopic || "Tema general",
-        feedback.isCorrect,
-      )
-      xpGained = progressUpdate.xpGained
-      newStreak = progressUpdate.newStreak
-      quiz.currentQuestion++
-      if (quiz.currentQuestion >= quiz.questions.length) {
-        quiz = null
-      }
-    } else {
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" })
-      const prompt = `
-        Eres un tutor virtual especializado en ${estudiante.asignatura.nombre}.
-        
-        Contexto actual:
-        - Tema: ${context.currentTopic || "General"}
-        - Últimos mensajes: ${context.messages.slice(-3).join("\n")}
-        
-        Mensaje del estudiante: "${message}"
-        
-        Instrucciones:
-        1. Responde de manera clara y didáctica
-        2. Si el estudiante hace una pregunta, explica con ejemplos
-        3. Si detectas confusión, ofrece una explicación alternativa
-        4. Mantén un tono motivador y positivo
-        
-        NO menciones el quiz final.
-        Enfócate en ayudar al estudiante a comprender el tema.
-      `
-      const result = await model.generateContent(prompt)
-      response = result.response.text()
-
-      if (context.studySession) {
-        if (response.toLowerCase().includes("ejemplo")) {
-          context.studySession.examples.push(response)
+        if (context.studySession) {
+          if (response.toLowerCase().includes("ejemplo")) {
+            context.studySession.examples.push(response)
+          }
         }
       }
     }
@@ -603,6 +775,7 @@ Selecciona un tema del panel izquierdo para comenzar una sesión de estudio. Te 
       xpGained,
       streak: newStreak,
       conversationHistory: context.conversationHistory,
+      geminiAvailable // Añadir esta bandera para que el frontend sepa si Gemini está disponible
     }
   } catch (error) {
     console.error("Error detallado:", error)
@@ -633,4 +806,3 @@ Selecciona un tema del panel izquierdo para comenzar una sesión de estudio. Te 
     }
   }
 })
-

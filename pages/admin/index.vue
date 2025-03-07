@@ -113,14 +113,14 @@
               class="w-full h-80 object-cover mb-6 rounded-lg" @error="handleImageError">
 
             <!-- Resumen de Gemini -->
-            <div class="bg-white dark:bg-gray-700 rounded-lg p-6 mb-6">
+            <div class="bg-white dark:bg-gray-700 rounded-lg p-6 mb-6 text-gray-900 dark:text-gray-300">
               <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
                 Resumen por IA
               </h3>
               <div v-if="geminiLoading" class="flex justify-center items-center h-20">
                 <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
               </div>
-              <div v-else-if="geminiSummary" class="text-lg space-y-4 text-gray-600 dark:text-gray-300">
+              <div v-else-if="geminiSummary" class="text-lg space-y-4 text-gray-900 dark:text-gray-300">
                 <div class="prose dark:prose-invert max-w-none whitespace-pre-line">
                   {{ geminiSummary }}
                 </div>

@@ -602,7 +602,6 @@ onUnmounted(() => {
 <style>
 /* Estilos base */
 .prose {
-  color: #f3f4f6;
   line-height: 1.6;
 }
 
