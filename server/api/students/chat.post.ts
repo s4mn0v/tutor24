@@ -1,808 +1,1156 @@
-import { PrismaClient } from "@prisma/client"
-import { GoogleGenerativeAI, type GenerativeModel } from "@google/generative-ai"
-import { type H3Event, createError, getRequestHeaders, readBody, defineEventHandler } from "h3"
-import jwt from "jsonwebtoken"
-import axios from "axios"
-import * as dotenv from 'dotenv'
-import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
-import fs from 'fs'
+import { defineEventHandler, readBody } from 'h3'
+import jwt from 'jsonwebtoken'
+import { PrismaClient } from '@prisma/client'
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import axios from 'axios'
 
-// Configuración para cargar variables de entorno
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-const rootDir = join(__dirname, '..', '..', '..')
-
-// Cargar variables de entorno desde .env
-const envPath = join(rootDir, '.env')
-if (fs.existsSync(envPath)) {
-  console.log('Cargando variables de entorno desde:', envPath)
-  dotenv.config({ path: envPath })
-} else {
-  console.warn('Archivo .env no encontrado en:', envPath)
-  // Intentar cargar desde la raíz del proyecto
-  dotenv.config()
-}
-
-// Obtener variables de entorno directamente
-const GEMINI_API_KEY = process.env.NUXT_GEMINI_API_KEY || process.env.GEMINI_API_KEY
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret"
-const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY
-
-// Verificar variables críticas
-if (!GEMINI_API_KEY) {
-  console.error('ADVERTENCIA: GEMINI_API_KEY no está definida')
-}
-
+// Inicializar Prisma y Google AI
 const prisma = new PrismaClient()
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
-// Inicializar Gemini con la API key si está disponible
-let genAI: GoogleGenerativeAI | null = null
-if (GEMINI_API_KEY) {
-  genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
+// Configuración del modelo
+const modelName = 'gemini-1.5-pro'
+const maxOutputTokens = 8192
+
+// Configuración de YouTube API
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY
+const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3/search'
+
+// Definir interfaces para los tipos de datos
+interface QuizData {
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  explanation: string;
+  timestamp: Date;
 }
 
-// Función para obtener una instancia del modelo
-function getGeminiModel(): GenerativeModel {
-  if (!genAI) {
-    throw new Error("Gemini API no está inicializada")
+interface Ejemplo {
+  id: number;
+  titulo: string;
+  problema: string;
+  solucion: string;
+  conclusion: string;
+}
+
+// Sistema simple de limitación de tasa (rate limiting)
+class RateLimiter {
+  private requests: Map<string, number[]> = new Map();
+  private readonly limit: number;
+  private readonly interval: number;
+
+  constructor(limit: number = 5, interval: number = 60000) { // 5 solicitudes por minuto
+    this.limit = limit;
+    this.interval = interval;
   }
-  return genAI.getGenerativeModel({ 
-    model: "gemini-1.5-pro", // Cambiado de "gemini-pro" a "gemini-1.5-pro"
+
+  canMakeRequest(userId: number): boolean {
+    const now = Date.now();
+    const userKey = userId.toString();
+    
+    if (!this.requests.has(userKey)) {
+      this.requests.set(userKey, [now]);
+      return true;
+    }
+
+    const userRequests = this.requests.get(userKey)!;
+    const recentRequests = userRequests.filter(time => time > now - this.interval);
+    
+    if (recentRequests.length < this.limit) {
+      this.requests.set(userKey, [...recentRequests, now]);
+      return true;
+    }
+
+    return false;
+  }
+
+  getTimeUntilNextRequest(userId: number): number {
+    const now = Date.now();
+    const userKey = userId.toString();
+    const userRequests = this.requests.get(userKey);
+    
+    if (!userRequests || userRequests.length === 0) return 0;
+    
+    const oldestRequest = Math.min(...userRequests);
+    const timeUntilReset = this.interval - (now - oldestRequest);
+    
+    return Math.max(0, timeUntilReset);
+  }
+}
+
+const rateLimiter = new RateLimiter();
+
+// Función para verificar token (ya que no tienes ~/server/utils/auth)
+async function verifyToken(token: string) {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret')
+    return decoded
+  } catch (error) {
+    return null
+  }
+}
+
+// Almacenamiento en memoria para mensajes de chat y datos de estudio
+// En producción, deberías usar una base de datos real para esto
+const chatStorage = {
+  messages: new Map<number, Array<{role: string, content: string, timestamp: Date}>>(),
+  currentTopics: new Map<number, string>(),
+  topicsProgress: new Map<number, Map<string, {progress: number, completed: boolean}>>(),
+  studyDocuments: new Map<number, Array<{id: number, title: string, topics: string[], type: string, url: string}>>(),
+  quizzes: new Map<string, QuizData>() // Almacenamiento específico para quizzes
+}
+
+// Función para generar contenido del tema con mejor formato
+const generateTopicContent = async (model: any, topic: string) => {
+  const prompt = `
+    Actúa como un tutor experto en ${topic}. 
+    Proporciona una explicación estructurada y clara sobre este tema.
+    
+    Estructura tu respuesta con el siguiente formato exacto para facilitar el procesamiento:
+
+    # ${topic}
+
+    ## Definición
+    [Proporciona una definición clara y concisa del concepto]
+
+    ## Conceptos Clave
+    - **[Concepto 1]**: [Breve explicación]
+    - **[Concepto 2]**: [Breve explicación]
+    - **[Concepto 3]**: [Breve explicación]
+
+    ## Explicación Detallada
+    [Desarrolla una explicación profunda del tema, usando párrafos bien estructurados]
+
+    ## Ejemplo Resuelto
+    Problema: [Plantea un problema práctico]
+    
+    Solución:
+    1. [Primer paso con explicación]
+    2. [Segundo paso con explicación]
+    3. [Tercer paso con explicación]
+    
+    Conclusión: [Resultado final]
+
+    ## Aplicaciones Prácticas
+    1. [Primera aplicación]
+    2. [Segunda aplicación]
+    3. [Tercera aplicación]
+
+    Asegúrate de usar exactamente los encabezados y formato indicados para facilitar el procesamiento.
+  `
+
+  // Asegurar que el primer mensaje sea del usuario
+  const chat = model.startChat({
+    history: [
+      {
+        role: 'user',
+        parts: [{ text: `Quiero aprender sobre ${topic}` }]
+      }
+    ],
     generationConfig: {
-      temperature: 0.7,
-      topP: 0.8,
-      topK: 40
-    }
-  })
-}
-
-interface StudentContext {
-  messages: string[]
-  currentTopic?: string
-  studySession?: {
-    topic: string
-    startTime: Date
-    concepts: string[]
-    examples: string[]
-  }
-  progress: { topic: string; lastReviewed: Date; masteryLevel: number }[]
-  xp: number
-  streak: number
-  lastLoginDate: Date
-  conversationHistory: string[]
-}
-
-interface Material {
-  id: number
-  nombre: string
-  tipo: string
-  url: string
-  creadoEn: Date
-  idAsignatura: number
-  topics?: string[]
-}
-
-const studentContexts = new Map<number, StudentContext>()
-
-async function getOrCreateStudentContext(userId: number): Promise<StudentContext> {
-  if (studentContexts.has(userId)) {
-    return studentContexts.get(userId)!
-  }
-
-  const student = await prisma.estudiante.findUnique({
-    where: { id: userId },
-    select: {
-      xp: true,
-      streak: true,
-      lastLoginDate: true,
+      maxOutputTokens: maxOutputTokens,
     },
   })
-
-  if (!student) {
-    throw new Error("Estudiante no encontrado")
-  }
-
-  const newContext: StudentContext = {
-    messages: [],
-    progress: [],
-    xp: student.xp || 0,
-    streak: student.streak || 0,
-    lastLoginDate: student.lastLoginDate || new Date(),
-    conversationHistory: [],
-  }
-
-  studentContexts.set(userId, newContext)
-  return newContext
+  
+  const result = await chat.sendMessage(prompt)
+  const response = await result.response
+  return response.text()
 }
 
-async function saveStudentContext(userId: number, context: StudentContext) {
-  await prisma.estudiante.update({
-    where: { id: userId },
-    data: {
-      xp: context.xp,
-      streak: context.streak,
-      lastLoginDate: context.lastLoginDate,
+// Función para generar ejemplos adicionales
+const generateAdditionalExamples = async (model: any, topic: string) => {
+  const prompt = `
+    Genera dos ejemplos detallados sobre ${topic}.
+    
+    Para cada ejemplo, usa este formato exacto:
+
+    # Ejemplo 1: [Título descriptivo]
+    
+    ## Problema
+    [Descripción clara del problema a resolver]
+
+    ## Solución Paso a Paso
+    1. [Primer paso]
+       * **Explicación**: [Por qué hacemos este paso]
+       * **Cálculos**: [Detalles matemáticos si aplican]
+    
+    2. [Segundo paso]
+       * **Explicación**: [Por qué hacemos este paso]
+       * **Cálculos**: [Detalles matemáticos si aplican]
+    
+    3. [Tercer paso]
+       * **Explicación**: [Por qué hacemos este paso]
+       * **Cálculos**: [Detalles matemáticos si aplican]
+
+    ## Conclusión
+    [Resumen del resultado y su significado]
+
+    # Ejemplo 2: [Título descriptivo]
+    [Mismo formato que el ejemplo 1]
+    
+    Asegúrate de usar exactamente los encabezados y formato indicados para facilitar el procesamiento.
+  `
+
+  // Asegurar que el primer mensaje sea del usuario
+  const chat = model.startChat({
+    history: [
+      {
+        role: 'user',
+        parts: [{ text: `Necesito ejemplos prácticos sobre ${topic}` }]
+      }
+    ],
+    generationConfig: {
+      maxOutputTokens: maxOutputTokens,
     },
   })
-  studentContexts.set(userId, context)
-}
-
-async function retryWithExponentialBackoff<T>(
-  operation: () => Promise<T>,
-  maxRetries = 10,
-  initialDelay = 1000,
-): Promise<T> {
-  let retries = 0
-  while (retries < maxRetries) {
-    try {
-      return await operation()
-    } catch (error: any) {
-      if (
-        error.status === 429 ||
-        (error.response && error.response.status === 429) ||
-        error.message.includes("Resource has been exhausted")
-      ) {
-        const delay = initialDelay * Math.pow(2, retries)
-        console.log(`Retrying after ${delay}ms... (Attempt ${retries + 1}/${maxRetries})`)
-        await new Promise((resolve) => setTimeout(resolve, delay))
-        retries++
-      } else {
-        throw error
-      }
-    }
-  }
-  throw new Error(`Operation failed after ${maxRetries} retries`)
-}
-
-function generateDefaultTopics(nombre: string): string[] {
-  return [
-    "Introducción a " + nombre,
-    "Conceptos básicos de " + nombre,
-    "Aplicaciones prácticas",
-    "Ejemplos y casos de estudio",
-    "Conclusiones y resumen",
-  ]
-}
-
-// Función de respuesta fallback cuando Gemini no está disponible
-function getFallbackResponse(prompt: string, asignaturaNombre: string): string {
-  if (prompt === "inicio") {
-    return `👋 ¡Bienvenido a tu asistente personal de estudio para ${asignaturaNombre}!
-
-⚠️ NOTA: El sistema está funcionando en modo limitado porque la API key de Gemini no está configurada.
-
-Para habilitar todas las funcionalidades, por favor configura la variable de entorno GEMINI_API_KEY.
-
-Mientras tanto, puedes explorar los materiales disponibles y revisar tus temas de estudio.`
-  }
   
-  if (prompt.startsWith("STUDY_TOPIC:")) {
-    const topic = prompt.replace("STUDY_TOPIC:", "").trim()
-    return `Has seleccionado el tema: ${topic}
-
-⚠️ NOTA: El contenido personalizado no está disponible porque la API key de Gemini no está configurada.
-
-Para habilitar todas las funcionalidades, por favor configura la variable de entorno GEMINI_API_KEY.`
-  }
-  
-  if (prompt.toLowerCase().includes("quiz") || prompt.toLowerCase().includes("evaluar")) {
-    return `Lo siento, la función de quiz no está disponible en este momento porque la API key de Gemini no está configurada.
-
-Para habilitar todas las funcionalidades, por favor configura la variable de entorno GEMINI_API_KEY.`
-  }
-  
-  return `Lo siento, no puedo generar una respuesta personalizada en este momento porque la API key de Gemini no está configurada.
-
-Para habilitar todas las funcionalidades, por favor configura la variable de entorno GEMINI_API_KEY.`
+  const result = await chat.sendMessage(prompt)
+  const response = await result.response
+  return response.text()
 }
 
-async function generateFinalQuiz(topic: string, concepts: string[], examples: string[]) {
-  if (!genAI) {
-    return [
+// Función para generar preguntas de quiz
+const generateQuiz = async (model: any, topic: string) => {
+  const prompt = `
+    Genera una pregunta de evaluación sobre ${topic}.
+    
+    La pregunta debe:
+    1. Evaluar comprensión profunda del tema
+    2. Tener 4 opciones (A, B, C, D)
+    3. Incluir una explicación detallada de la solución
+    
+    Usa este formato exacto:
+
+    PREGUNTA
+    [Texto de la pregunta]
+
+    OPCIONES
+    A) [Opción A]
+    B) [Opción B]
+    C) [Opción C]
+    D) [Opción D]
+
+    RESPUESTA_CORRECTA
+    [Letra de la respuesta correcta]
+
+    EXPLICACION
+    1. **Análisis del problema**:
+       [Explicar cómo abordar el problema]
+    
+    2. **Proceso de solución**:
+       [Detallar paso a paso cómo se llega a la respuesta]
+    
+    3. **Por qué las otras opciones son incorrectas**:
+       - Opción [X]: [Explicar por qué es incorrecta]
+       - Opción [Y]: [Explicar por qué es incorrecta]
+       - Opción [Z]: [Explicar por qué es incorrecta]
+    
+    4. **Conclusión**:
+       [Reforzar el concepto clave evaluado]
+  `
+
+  // Asegurar que el primer mensaje sea del usuario
+  const chat = model.startChat({
+    history: [
       {
-        question: "Pregunta de ejemplo (Gemini API no disponible)",
-        options: ["A) Opción 1", "B) Opción 2", "C) Opción 3", "D) Opción 4"],
-        correctAnswer: "A",
-        explanation: "Esta es una pregunta de ejemplo. Configura la API key de Gemini para obtener preguntas personalizadas."
+        role: 'user',
+        parts: [{ text: `Necesito una pregunta de quiz sobre ${topic}` }]
       }
-    ]
-  }
-  
-  return retryWithExponentialBackoff(async () => {
-    const model = getGeminiModel()
-    const prompt = `
-      Como profesor experto, genera 4 preguntas diferentes para evaluar el aprendizaje sobre: ${topic}
-
-      Conceptos estudiados:
-      ${concepts.join("\n")}
-
-      Ejemplos revisados:
-      ${examples.join("\n")}
-
-      Genera 4 preguntas diferentes de selección múltiple que evalúen la comprensión de los conceptos y ejemplos estudiados.
-      
-      Responde en formato JSON:
-      {
-        "questions": [
-          {
-            "question": "Primera pregunta",
-            "options": ["A) opción 1", "B) opción 2", "C) opción 3", "D) opción 4"],
-            "correctAnswer": "A",
-            "explanation": "Explicación detallada"
-          },
-          // ... (3 preguntas más)
-        ]
-      }
-    `
-    const result = await model.generateContent(prompt)
-    const response = JSON.parse(result.response.text())
-    return response.questions
+    ],
+    generationConfig: {
+      maxOutputTokens: maxOutputTokens,
+    },
   })
-}
-
-async function analyzeDocument(nombre: string, contenido: string): Promise<{ title: string; topics: string[] }> {
-  if (!genAI) {
-    return {
-      title: nombre,
-      topics: generateDefaultTopics(nombre)
-    }
-  }
   
-  try {
-    return await retryWithExponentialBackoff(async () => {
-      const model = getGeminiModel()
-      const prompt = `
-        Analiza el siguiente documento y genera una lista de temas principales que se cubren en él.
-        Si el contenido no es claro o está vacío, genera temas específicos basados en el título del documento.
+  const result = await chat.sendMessage(prompt)
+  const response = await result.response
+  const responseText = response.text()
 
-        Título del documento: "${nombre}"
-        Contenido del documento: "${contenido}"
+  // Extraer las partes del quiz
+  const questionMatch = responseText.match(/PREGUNTA\n([\s\S]*?)\n\nOPCIONES/)
+  const optionsMatch = responseText.match(/OPCIONES\n([\s\S]*?)\n\nRESPUESTA_CORRECTA/)
+  const answerMatch = responseText.match(/RESPUESTA_CORRECTA\n([A-D])/)
+  const explanationMatch = responseText.match(/EXPLICACION\n([\s\S]*?)$/)
 
-        Instrucciones:
-        1. Identifica los conceptos clave y temas principales del documento
-        2. Si el contenido está vacío, infiere temas específicos basados en el título
-        3. Genera exactamente 5 temas principales y específicos
-        4. Asegúrate de que los temas sean relevantes para el estudio y aprendizaje
-
-        Responde SOLO con una lista de 5 temas específicos, uno por línea, sin numeración ni puntos.
-      `
-      const result = await model.generateContent(prompt)
-      const text = result.response.text().trim()
-      const topics = text.split("\n").filter((topic) => topic.trim() !== "")
-
-      return {
-        title: nombre,
-        topics: topics.length === 5 ? topics : generateDefaultTopics(nombre),
-      }
-    })
-  } catch (error) {
-    console.error(`Error analizando material (usando temas predeterminados):`, error)
-    return {
-      title: nombre,
-      topics: generateDefaultTopics(nombre)
-    }
+  // Extraer las opciones individuales
+  let options: string[] = [];
+  if (optionsMatch && optionsMatch[1]) {
+    const optionsText = optionsMatch[1].trim();
+    options = [
+      optionsText.match(/A\)(.*?)(?=\nB\)|$)/s)?.[1]?.trim() || '',
+      optionsText.match(/B\)(.*?)(?=\nC\)|$)/s)?.[1]?.trim() || '',
+      optionsText.match(/C\)(.*?)(?=\nD\)|$)/s)?.[1]?.trim() || '',
+      optionsText.match(/D\)(.*?)(?=\n|$)/s)?.[1]?.trim() || ''
+    ];
   }
-}
 
-async function generateQuiz(topic: string, context: string, materials: Material[]) {
-  if (!genAI) {
-    return {
-      question: "Pregunta de ejemplo (Gemini API no disponible)",
-      options: ["A) Opción 1", "B) Opción 2", "C) Opción 3", "D) Opción 4"],
-      correctAnswer: "A",
-      explanation: "Esta es una pregunta de ejemplo. Configura la API key de Gemini para obtener preguntas personalizadas."
-    }
-  }
-  
-  return retryWithExponentialBackoff(async () => {
-    const model = getGeminiModel()
-    const prompt = `
-    Como profesor experto, genera una pregunta de evaluación sobre ${topic}.
-    
-    Contexto del material:
-    ${materials.map((m) => `- ${m.nombre}`).join("\n")}
-    
-    Genera una pregunta específica basada en el tema y los nombres de los materiales disponibles.
-    La pregunta debe ser de selección múltiple con 4 opciones.
-    
-    Responde en formato JSON:
-    {
-      "question": "Pregunta específica basada en el tema",
-      "options": [
-        "Primera opción específica",
-        "Segunda opción específica",
-        "Tercera opción específica",
-        "Cuarta opción específica"
-      ],
-      "correctAnswer": "A, B, C o D",
-      "explanation": "Explicación educativa que ayude a comprender el concepto"
-    }
-    `
-    const result = await model.generateContent(prompt)
-    const response = result.response.text()
-    return JSON.parse(response)
-  })
-}
-
-async function checkQuizAnswer(quiz: any, userAnswer: string) {
-  const isCorrect = userAnswer.toUpperCase() === quiz.correctAnswer
   return {
-    isCorrect,
-    feedback: isCorrect
-      ? `¡Excelente! 🎉 Recuerda: ${quiz.explanation}`
-      : `La respuesta correcta es ${quiz.correctAnswer}. ${quiz.explanation}`,
+    question: questionMatch ? questionMatch[1].trim() : '',
+    options: options,
+    correctAnswer: answerMatch ? answerMatch[1] : '',
+    explanation: explanationMatch ? explanationMatch[1].trim() : ''
   }
 }
 
-async function detectCurrentTopic(messages: string[], context = "") {
-  if (!genAI) {
-    return "Tema general"
+// Función para buscar videos en YouTube
+async function buscarVideoYouTube(tema: string) {
+  if (!YOUTUBE_API_KEY) {
+    throw new Error('YouTube API Key no configurada')
   }
   
-  return retryWithExponentialBackoff(async () => {
-    const model = getGeminiModel()
-    const prompt = `
-      Analiza esta conversación y contexto:
-      
-      Contexto del material: ${context}
-      
-      Últimos mensajes:
-      ${messages.slice(-6).join("\n")}
-      
-      Identifica el tema específico que se está estudiando actualmente.
-      Responde SOLO con el tema identificado.
-    `
-    const result = await model.generateContent(prompt)
-    return result.response.text()
-  })
-}
-
-async function updateStudentProgress(userId: number, topic: string, isCorrect: boolean) {
-  const context = await getOrCreateStudentContext(userId)
-  const now = new Date()
-  const progressIndex = context.progress.findIndex((p) => p.topic === topic)
-
-  if (progressIndex === -1) {
-    context.progress.push({
-      topic,
-      lastReviewed: now,
-      masteryLevel: isCorrect ? 1 : 0,
-    })
-  } else {
-    const currentProgress = context.progress[progressIndex]
-    currentProgress.lastReviewed = now
-    currentProgress.masteryLevel = Math.max(0, Math.min(5, currentProgress.masteryLevel + (isCorrect ? 1 : -1)))
-  }
-
-  const xpGained = isCorrect ? Math.floor(Math.random() * 5) * 100 + 100 : 0
-  context.xp += xpGained
-
-  const lastLogin = context.lastLoginDate
-  const today = new Date()
-  if (today.toDateString() !== lastLogin.toDateString()) {
-    if ((today.getTime() - lastLogin.getTime()) / (1000 * 3600 * 24) <= 1) {
-      context.streak += 1
-    } else {
-      context.streak = 1
-    }
-    context.lastLoginDate = today
-  }
-
-  await saveStudentContext(userId, context)
-
-  return { xpGained, newStreak: context.streak }
-}
-
-async function getMaterialesActualizados(asignaturaId: number): Promise<Material[]> {
-  const materials = await prisma.material.findMany({
-    where: {
-      idAsignatura: asignaturaId,
-    },
-    orderBy: {
-      creadoEn: "desc",
-    },
-    select: {
-      id: true,
-      nombre: true,
-      tipo: true,
-      url: true,
-      creadoEn: true,
-      idAsignatura: true,
-    },
-    // Limitar a 3 materiales para reducir solicitudes a Gemini
-    take: 3
-  })
-
-  // Si Gemini no está disponible, usar temas predeterminados
-  if (!genAI) {
-    return materials.map(material => ({
-      ...material,
-      topics: generateDefaultTopics(material.nombre)
-    }))
-  }
-
-  const analyzedMaterials = await Promise.all(
-    materials.map(async (material) => {
-      try {
-        const analyzed = await analyzeDocument(material.nombre, "")
-        return {
-          ...material,
-          topics: analyzed.topics,
-        }
-      } catch (error) {
-        console.error(`Error analizando material ${material.id}:`, error)
-        return {
-          ...material,
-          topics: generateDefaultTopics(material.nombre),
-        }
-      }
-    }),
-  )
-
-  return analyzedMaterials
-}
-
-async function selectTopic(topic: string, contenido: string) {
-  if (!genAI) {
-    return `Has seleccionado el tema: ${topic}
-
-Lo siento, no puedo generar contenido personalizado porque la API key de Gemini no está configurada.
-
-Para habilitar todas las funcionalidades, por favor configura la variable de entorno GEMINI_API_KEY.`
-  }
-  
-  return retryWithExponentialBackoff(async () => {
-    const model = getGeminiModel()
-    const prompt = `
-      Eres un tutor experto en el tema "${topic}".
-      
-      Contenido del documento relacionado:
-      "${contenido}"
-
-      Instrucciones:
-      1. Analiza el contenido del documento proporcionado
-      2. Si el contenido es relevante para el tema "${topic}", úsalo como base para tu explicación
-      3. Si el contenido no es relevante o está vacío, genera una explicación detallada basada en tu conocimiento experto sobre "${topic}"
-      4. Da una breve introducción motivadora al tema
-      5. Explica los conceptos fundamentales de manera clara y concisa
-      6. Proporciona ejemplos prácticos relacionados con el tema
-      7. Haz 2-3 preguntas de comprensión para evaluar el entendimiento del estudiante
-      8. Anima al estudiante a hacer preguntas si tiene dudas
-      
-      Limita tu respuesta a aproximadamente 400-500 palabras.
-      NO menciones que estás generando contenido o que no tienes información específica.
-      Enfócate en proporcionar una explicación interactiva, comprensible y específica sobre el tema.
-    `
-    const result = await model.generateContent(prompt)
-    return result.response.text()
-  })
-}
-
-async function getRelatedVideo(topic: string): Promise<string> {
   try {
-    if (!YOUTUBE_API_KEY) {
-      console.warn("YOUTUBE_API_KEY no está definida. No se pueden obtener videos relacionados.")
-      return ""
+    // Buscar videos educativos sobre el tema
+    const response = await axios.get(YOUTUBE_API_URL, {
+      params: {
+        part: 'snippet',
+        maxResults: 1,
+        q: `${tema} educativo explicación tutorial`,
+        type: 'video',
+        relevanceLanguage: 'es',
+        key: YOUTUBE_API_KEY
+      }
+    })
+    
+    if (!response.data.items || response.data.items.length === 0) {
+      throw new Error('No se encontraron videos')
     }
     
-    const response = await axios.get(`https://www.googleapis.com/youtube/v3/search`, {
-      params: {
-        part: "snippet",
-        q: topic + " educativo",
-        type: "video",
-        maxResults: 1,
-        key: YOUTUBE_API_KEY,
-        relevanceLanguage: "es",
-      },
-    })
-
-    if (response.data.items && response.data.items.length > 0) {
-      const videoId = response.data.items[0].id.videoId
-      return `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
-    } else {
-      return ""
+    const video = response.data.items[0]
+    
+    return {
+      provider: 'youtube',
+      videoId: video.id.videoId,
+      title: video.snippet.title,
+      description: video.snippet.description,
+      thumbnailUrl: video.snippet.thumbnails.high.url
     }
   } catch (error) {
-    console.error("Error al obtener video relacionado:", error)
-    return ""
+    console.error('Error al buscar videos en YouTube:', error)
+    throw error
   }
 }
 
-export default defineEventHandler(async (event: H3Event) => {
-  try {
-    // Verificar si Gemini está disponible
-    const geminiAvailable = !!genAI
+// Función para procesar el texto de respuesta y extraer secciones estructuradas
+function procesarContenidoTema(responseText: string) {
+  // Extraer título
+  const titleMatch = responseText.match(/^#\s*(.*?)$/m) || responseText.match(/^(.*?)$/m)
+  const title = titleMatch ? titleMatch[1].trim() : ''
+  
+  // Extraer definición
+  const definitionRegex = /## Definición\n([\s\S]*?)(?=\n##)/i
+  const definitionMatch = responseText.match(definitionRegex)
+  const definition = definitionMatch ? definitionMatch[1].trim() : ''
+  
+  // Extraer conceptos clave
+  const conceptsRegex = /## Conceptos Clave\n([\s\S]*?)(?=\n##)/i
+  const conceptsMatch = responseText.match(conceptsRegex)
+  const conceptsText = conceptsMatch ? conceptsMatch[1] : ''
+  
+  // Procesar cada concepto
+  const conceptLines = conceptsText.split('\n').filter(line => line.trim().startsWith('-'))
+  const concepts = conceptLines.map(line => {
+    const cleanLine = line.replace(/^-\s*/, '').trim()
+    const titleMatch = cleanLine.match(/\*\*(.*?)\*\*:(.*)/) || cleanLine.match(/(.*?):(.*)/)
     
-    // Si Gemini no está disponible, mostrar advertencia pero continuar
-    if (!geminiAvailable) {
-      console.warn("Funcionando en modo limitado: GEMINI_API_KEY no está definida")
+    if (titleMatch) {
+      return {
+        title: titleMatch[1].replace(/\*\*/g, '').trim(),
+        description: titleMatch[2].trim()
+      }
     }
+    
+    return {
+      title: 'Concepto',
+      description: cleanLine
+    }
+  })
+  
+  // Extraer explicación detallada
+  const explanationRegex = /## Explicación Detallada\n([\s\S]*?)(?=\n##)/i
+  const explanationMatch = responseText.match(explanationRegex)
+  const explanation = explanationMatch ? explanationMatch[1].trim() : ''
+  
+  // Extraer ejemplo resuelto
+  const exampleRegex = /## Ejemplo Resuelto\n([\s\S]*?)(?=\n##|$)/i
+  const exampleMatch = responseText.match(exampleRegex)
+  const exampleText = exampleMatch ? exampleMatch[1] : ''
+  
+  // Extraer problema y solución
+  const problemRegex = /Problema:\s*([\s\S]*?)(?=\n\nSolución:)/i
+  const problemMatch = exampleText.match(problemRegex)
+  const problem = problemMatch ? problemMatch[1].trim() : ''
+  
+  const solutionRegex = /Solución:\s*([\s\S]*?)(?=\n\nConclusión:|$)/i
+  const solutionMatch = exampleText.match(solutionRegex)
+  const solution = solutionMatch ? solutionMatch[1].trim() : ''
+  
+  const conclusionRegex = /Conclusión:\s*([\s\S]*?)$/i
+  const conclusionMatch = exampleText.match(conclusionRegex)
+  const conclusion = conclusionMatch ? conclusionMatch[1].trim() : ''
+  
+  // Extraer aplicaciones prácticas
+  const applicationsRegex = /## Aplicaciones Prácticas\n([\s\S]*?)(?=\n##|$)/i
+  const applicationsMatch = responseText.match(applicationsRegex)
+  const applicationsText = applicationsMatch ? applicationsMatch[1] : ''
+  
+  // Procesar aplicaciones
+  const applicationLines = applicationsText.split('\n').filter(line => /^\d+\./.test(line.trim()))
+  const applications = applicationLines.map(line => line.replace(/^\d+\.\s*/, '').trim())
+  
+  return {
+    title,
+    definition,
+    concepts,
+    explanation,
+    example: {
+      problem,
+      solution,
+      conclusion
+    },
+    applications
+  }
+}
 
-    const headers = getRequestHeaders(event)
-    const token = headers.authorization?.split(" ")[1]
-
+export default defineEventHandler(async (event) => {
+  try {
+    // Verificar autenticación
+    const token = event.req.headers.authorization?.split(' ')[1]
     if (!token) {
-      throw createError({
-        statusCode: 401,
-        message: "Acceso no autorizado",
-      })
-    }
-
-    let decoded
-    try {
-      decoded = jwt.verify(token, JWT_SECRET) as {
-        userId: number
-        asignaturaId: number
-        type?: string
+      return { 
+        status: 401, 
+        message: 'No autorizado' 
       }
-    } catch (error) {
-      if (error instanceof jwt.TokenExpiredError) {
-        throw createError({
-          statusCode: 401,
-          message: "SESSION_EXPIRED",
-        })
+    }
+
+    const decoded = await verifyToken(token) as any
+    if (!decoded) {
+      return { 
+        status: 401, 
+        message: 'Token inválido' 
       }
-      throw error
     }
 
-    // Si el token es de tipo refresh, rechazar la solicitud
-    if (decoded.type === "refresh") {
-      throw createError({
-        statusCode: 401,
-        message: "Tipo de token inválido",
-      })
-    }
-
-    const estudiante = await prisma.estudiante.findFirst({
-      where: {
-        id: decoded.userId,
-        asignaturaId: decoded.asignaturaId,
-      },
-      include: {
-        asignatura: true,
-        usuario: true,
-      },
+    const userId = decoded.userId
+    
+    // Obtener datos del estudiante
+    const estudiante = await prisma.estudiante.findUnique({
+      where: { id: userId }
     })
 
     if (!estudiante) {
-      throw createError({
-        statusCode: 404,
-        message: "Estudiante no encontrado",
-      })
+      return { 
+        status: 404, 
+        message: 'Estudiante no encontrado' 
+      }
     }
 
-    const context = await getOrCreateStudentContext(decoded.userId)
+    // Obtener mensaje del usuario
     const body = await readBody(event)
-    const { message, answer } = body
+    const userMessage = body.message
 
-    let response = ""
-    let quiz: any = null
-    let answerFeedback: { isCorrect: boolean; feedback: string; } | null = null;
-    let xpGained = 0
-    let newStreak = context.streak
-    let videoEmbed = ""
+    // Inicializar almacenamiento para este usuario si no existe
+    if (!chatStorage.messages.has(userId)) {
+      chatStorage.messages.set(userId, [])
+    }
+    if (!chatStorage.topicsProgress.has(userId)) {
+      chatStorage.topicsProgress.set(userId, new Map())
+    }
+    if (!chatStorage.studyDocuments.has(userId)) {
+      // Crear documentos de ejemplo para el estudiante
+      chatStorage.studyDocuments.set(userId, [
+        {
+          id: 1,
+          title: 'algebra_lineal.pdf',
+          topics: ['Transformaciones lineales', 'Espacios vectoriales', 'Matrices'],
+          type: 'pdf',
+          url: '/documents/algebra_lineal.pdf'
+        },
+        {
+          id: 2,
+          title: 'calculo_diferencial.pdf',
+          topics: ['Límites', 'Derivadas', 'Integrales'],
+          type: 'pdf',
+          url: '/documents/calculo_diferencial.pdf'
+        }
+      ])
+    }
 
-    const materials = await getMaterialesActualizados(decoded.asignaturaId)
+    // Obtener historial de chat
+    const chatHistory = chatStorage.messages.get(userId) || []
+    
+    // Formatear historial para el modelo - CORREGIDO PARA ASEGURAR QUE EL PRIMER MENSAJE SEA DEL USUARIO
+    let formattedHistory = chatHistory.map(msg => ({
+      role: msg.role,
+      parts: [{ text: msg.content }]
+    }))
+    
+    // Si el historial está vacío o el primer mensaje no es del usuario, añadir un mensaje inicial del usuario
+    if (formattedHistory.length === 0 || formattedHistory[0].role !== 'user') {
+      formattedHistory = [
+        {
+          role: 'user',
+          parts: [{ text: 'Hola, soy un estudiante que necesita ayuda.' }]
+        },
+        ...formattedHistory
+      ]
+    }
 
-    context.conversationHistory = context.conversationHistory.slice(-19)
-    context.conversationHistory.push(`Usuario: ${message}`)
+    // Si es un mensaje de inicio, devolver información inicial
+    if (userMessage === 'inicio') {
+      // Obtener documentos y temas
+      const documents = chatStorage.studyDocuments.get(userId) || []
 
-    // Si Gemini no está disponible, usar respuestas predefinidas
-    if (!geminiAvailable) {
-      response = getFallbackResponse(message, estudiante.asignatura.nombre)
+      // Obtener progreso de temas
+      const topicsProgressMap = chatStorage.topicsProgress.get(userId) || new Map()
       
-      if (message.startsWith("STUDY_TOPIC:")) {
-        const selectedTopic = message.replace("STUDY_TOPIC:", "").trim()
-        context.currentTopic = selectedTopic
+      // Convertir el mapa de progreso a un array
+      const formattedTopics = Array.from(topicsProgressMap.entries()).map(([name, data]) => ({
+        name,
+        progress: data.progress,
+        completed: data.completed,
+        inProgress: data.progress > 0 && !data.completed
+      }))
+
+      // Si no hay temas, crear algunos por defecto
+      const defaultTopics = [
+        { name: 'Transformaciones lineales', progress: 0, completed: false, inProgress: false },
+        { name: 'Espacios vectoriales', progress: 0, completed: false, inProgress: false },
+        { name: 'Matrices', progress: 0, completed: false, inProgress: false }
+      ]
+      if (formattedTopics.length === 0) {
+        defaultTopics.forEach(topic => {
+          topicsProgressMap.set(topic.name, { 
+            progress: topic.progress, 
+            completed: topic.completed 
+          })
+        })
+        
+        chatStorage.topicsProgress.set(userId, topicsProgressMap)
       }
-    } else {
-      // Gemini está disponible, usar la funcionalidad completa
-      if (message === "inicio") {
-        response = `👋 ¡Bienvenido a tu asistente personal de estudio para ${estudiante.asignatura.nombre}!
 
-Estoy aquí para ayudarte a prepararte para tus exámenes y evaluaciones. Podemos:
-
-📚 Estudiar cualquier tema en profundidad
-📝 Practicar con ejemplos reales
-💡 Resolver tus dudas específicas
-🎯 Evaluar tu comprensión con quizzes personalizados
-
-Selecciona un tema del panel izquierdo para comenzar una sesión de estudio. Te guiaré paso a paso y al final evaluaremos tu comprensión con un quiz personalizado.
-
-¿Listo para empezar? 💪`
-      } else if (message.startsWith("STUDY_TOPIC:")) {
-        const selectedTopic = message.replace("STUDY_TOPIC:", "").trim()
-        context.currentTopic = selectedTopic
-
-        // Buscar el documento que contiene el tema seleccionado
-        const relevantDocument = materials.find((doc) =>
-          doc.topics?.some((topic) => topic.toLowerCase() === selectedTopic.toLowerCase()),
-        )
-
-        if (relevantDocument) {
-          response = await selectTopic(selectedTopic, relevantDocument.nombre)
-
-          context.studySession = {
-            topic: selectedTopic,
-            startTime: new Date(),
-            concepts: [],
-            examples: [],
-          }
-
-          // Extraer conceptos y ejemplos de la respuesta
-          const model = getGeminiModel()
-          const conceptsPrompt = `
-            Extrae los conceptos clave mencionados en esta explicación:
-            ${response}
-            
-            Responde solo con la lista de conceptos, uno por línea.
-          `
-          const conceptsResult = await model.generateContent(conceptsPrompt)
-          context.studySession.concepts = conceptsResult.response.text().split("\n")
-
-          const examplesPrompt = `
-            Extrae los ejemplos mencionados en esta explicación:
-            ${response}
-            
-            Responde solo con la lista de ejemplos, uno por línea.
-          `
-          const examplesResult = await model.generateContent(examplesPrompt)
-          context.studySession.examples = examplesResult.response.text().split("\n")
-
-          // Obtener video relacionado
-          videoEmbed = await getRelatedVideo(selectedTopic)
-          if (videoEmbed) {
-            response += "\n\nAquí tienes un video relacionado con el tema:\n" + videoEmbed
-          }
-        } else {
-          // Si no se encuentra un documento relevante, generar una respuesta basada en el tema
-          response = await selectTopic(selectedTopic, "")
-        }
-      } else if (message.toLowerCase().includes("video") || message.toLowerCase().includes("repasar")) {
-        if (context.currentTopic) {
-          videoEmbed = await getRelatedVideo(context.currentTopic)
-          if (videoEmbed) {
-            response = `Aquí tienes un video para repasar el tema "${context.currentTopic}":\n${videoEmbed}`
-          } else {
-            response = `Lo siento, no pude encontrar un video adecuado para el tema "${context.currentTopic}".`
-          }
-        } else {
-          response = "Primero necesitamos seleccionar un tema antes de buscar un video. ¿Qué tema te gustaría estudiar?"
-        }
-      } else if (message.toLowerCase().includes("quiz") || message.toLowerCase().includes("evaluar")) {
-        if (context.studySession) {
-          const questions = await generateFinalQuiz(
-            context.studySession.topic,
-            context.studySession.concepts,
-            context.studySession.examples,
-          )
-          quiz = {
-            questions,
-            currentQuestion: 0,
-          }
-          response =
-            "¡Excelente sesión de estudio! Vamos a evaluar tu comprensión con estas preguntas. Responde con la letra de la opción que consideres correcta (A, B, C o D):"
-        } else {
-          response = "Primero necesitamos estudiar un tema antes de hacer el quiz. ¿Qué tema te gustaría estudiar?"
-        }
-      } else if (answer && quiz) {
-        const feedback = await checkQuizAnswer(quiz.questions[quiz.currentQuestion], answer)
-        answerFeedback = feedback ?? null;
-        response = feedback.feedback
-
-        const progressUpdate = await updateStudentProgress(
-          decoded.userId,
-          context.currentTopic || "Tema general",
-          feedback.isCorrect,
-        )
-        xpGained = progressUpdate.xpGained
-        newStreak = progressUpdate.newStreak
-        quiz.currentQuestion++
-        if (quiz.currentQuestion >= quiz.questions.length) {
-          quiz = null
-        }
-      } else {
-        const model = getGeminiModel()
-        const prompt = `
-          Eres un tutor virtual especializado en ${estudiante.asignatura.nombre}.
-          
-          Contexto actual:
-          - Tema: ${context.currentTopic || "General"}
-          - Últimos mensajes: ${context.messages.slice(-3).join("\n")}
-          
-          Mensaje del estudiante: "${message}"
-          
-          Instrucciones:
-          1. Responde de manera clara y didáctica
-          2. Si el estudiante hace una pregunta, explica con ejemplos
-          3. Si detectas confusión, ofrece una explicación alternativa
-          4. Mantén un tono motivador y positivo
-          
-          NO menciones el quiz final.
-          Enfócate en ayudar al estudiante a comprender el tema.
-        `
-        const result = await model.generateContent(prompt)
-        response = result.response.text()
-
-        if (context.studySession) {
-          if (response.toLowerCase().includes("ejemplo")) {
-            context.studySession.examples.push(response)
-          }
-        }
+      return {
+        text: null,
+        messageType: 'welcome',
+        welcomeData: {
+          title: 'Bienvenido a tu Tutor Personal',
+          description: 'Estoy aquí para ayudarte a dominar los conceptos de física y potenciar tu aprendizaje académico.',
+          features: [
+            {
+              icon: 'book',
+              title: 'Explorar Temas',
+              description: 'Selecciona temas específicos del panel izquierdo para estudiarlos en profundidad.'
+            },
+            {
+              icon: 'example',
+              title: 'Ejemplos Prácticos',
+              description: 'Solicita ejemplos detallados con soluciones paso a paso para comprender mejor los conceptos.'
+            },
+            {
+              icon: 'quiz',
+              title: 'Evaluación',
+              description: 'Pon a prueba tu conocimiento con preguntas tipo test y recibe feedback inmediato.'
+            },
+            {
+              icon: 'video',
+              title: 'Recursos Multimedia',
+              description: 'Accede a videos y recursos complementarios para enriquecer tu aprendizaje.'
+            }
+          ],
+          cta: '¿Por dónde te gustaría comenzar hoy?'
+        },
+        estudiante: {
+          nombre: estudiante.nombre,
+          nivel: Math.floor(estudiante.xp / 100) + 1 // Calcular nivel basado en XP
+        },
+        xp: estudiante.xp || 0,
+        topics: formattedTopics.length > 0 ? formattedTopics : defaultTopics,
+        documents: documents
       }
     }
 
-    context.messages.push(`Usuario: ${message}`)
-    context.messages.push(`Asistente: ${response}`)
-    if (context.messages.length > 40) {
-      context.messages = context.messages.slice(-40)
-    }
-
-    context.conversationHistory.push(`Asistente: ${response}`)
-    if (context.conversationHistory.length > 20) {
-      context.conversationHistory = context.conversationHistory.slice(-20)
-    }
-
-    await saveStudentContext(decoded.userId, context)
-
-    const documents = await getMaterialesActualizados(decoded.asignaturaId)
-
-    return {
-      text: response,
-      quiz,
-      answerFeedback,
-      currentTopic: context.currentTopic,
-      videoEmbed,
-      estudiante: {
-        nombre: estudiante.nombre,
-        nivel: Math.floor(context.xp / 1000) + 1,
-      },
-      documents: documents.map((doc) => ({
-        id: doc.id,
-        title: doc.nombre,
-        topics: doc.topics || [],
-        type: doc.tipo,
-        url: doc.url,
-      })),
-      topics: context.progress.map((p) => ({
-        name: p.topic,
-        progress: p.masteryLevel * 20,
-        completed: p.masteryLevel === 5,
-        inProgress: p.masteryLevel > 0 && p.masteryLevel < 5,
-      })),
-      xp: context.xp,
-      xpGained,
-      streak: newStreak,
-      conversationHistory: context.conversationHistory,
-      geminiAvailable // Añadir esta bandera para que el frontend sepa si Gemini está disponible
-    }
-  } catch (error) {
-    console.error("Error detallado:", error)
-    if (error instanceof Error) {
-      const statusCode = (error as any).statusCode || 500
-      const message =
-        error.message === "SESSION_EXPIRED"
-          ? "Tu sesión ha expirado. Por favor, vuelve a iniciar sesión."
-          : `Error al procesar tu solicitud: ${error.message}`
-
-      if ((error as any).status === 429) {
+    // Si es una solicitud de estudio de tema
+    if (userMessage.startsWith('STUDY_TOPIC:')) {
+      const topic = userMessage.replace('STUDY_TOPIC:', '')
+      
+      // Registrar el tema actual que está estudiando el usuario
+      chatStorage.currentTopics.set(userId, topic)
+      
+      // Verificar si el tema existe en el almacenamiento
+      const topicsProgressMap = chatStorage.topicsProgress.get(userId) || new Map()
+      
+      if (!topicsProgressMap.has(topic)) {
+        topicsProgressMap.set(topic, { progress: 0, completed: false })
+        chatStorage.topicsProgress.set(userId, topicsProgressMap)
+      }
+      
+      // Verificar límite de tasa
+      if (!rateLimiter.canMakeRequest(userId)) {
+        const waitTime = rateLimiter.getTimeUntilNextRequest(userId);
         return {
-          text: "Lo siento, el sistema está experimentando una alta demanda en este momento. Por favor, intenta de nuevo en unos minutos.",
-          documents: [],
-          topics: [],
+          status: 429,
+          message: `Has alcanzado el límite de solicitudes. Por favor espera ${Math.ceil(waitTime / 1000)} segundos.`,
+          waitTime,
+          messageType: 'error'
         }
       }
+      
+      // Generar contenido del tema con Gemini
+      const model = genAI.getGenerativeModel({ model: modelName })
+      
+      try {
+        // Usar la nueva función para generar contenido estructurado
+        const responseText = await generateTopicContent(model, topic)
+        
+        // Procesar el contenido para obtener secciones estructuradas
+        const contenidoProcesado = procesarContenidoTema(responseText)
+        
+        // Guardar mensaje en el almacenamiento
+        const chatMessages = chatStorage.messages.get(userId) || []
+        
+        // Guardar el mensaje del usuario primero
+        chatMessages.push({
+          role: 'user',
+          content: `Quiero aprender sobre ${topic}`,
+          timestamp: new Date()
+        })
+        
+        // Luego guardar la respuesta del asistente
+        chatMessages.push({
+          role: 'assistant',
+          content: responseText,
+          timestamp: new Date()
+        })
+        
+        chatStorage.messages.set(userId, chatMessages)
+        
+        // Actualizar progreso del tema
+        const topicData = topicsProgressMap.get(topic) || { progress: 0, completed: false }
+        topicData.progress = Math.min(100, topicData.progress + 10)
+        topicData.completed = topicData.progress >= 100
+        topicsProgressMap.set(topic, topicData)
+        
+        // Generar un quiz para tener listo (en segundo plano)
+        try {
+          const quizData = await generateQuiz(model, topic)
+          const quizKey = `${userId}_lastQuiz`
+          chatStorage.quizzes.set(quizKey, {
+            ...quizData,
+            timestamp: new Date()
+          })
+        } catch (error) {
+          console.error('Error al generar quiz en segundo plano:', error)
+          // No interrumpimos el flujo principal si falla la generación del quiz
+        }
+        
+        return {
+          text: responseText,
+          messageType: 'topic',
+          topicData: {
+            title: contenidoProcesado.title || topic,
+            definition: contenidoProcesado.definition,
+            concepts: contenidoProcesado.concepts,
+            explanation: contenidoProcesado.explanation,
+            example: contenidoProcesado.example,
+            applications: contenidoProcesado.applications
+          },
+          currentTopic: topic,
+          rawContent: responseText // Incluir el contenido sin procesar por si acaso
+        }
+      } catch (error: any) {
+        console.error('Error al generar contenido con Gemini:', error)
+        
+        // Manejar error de límite de tasa
+        if (error.status === 429) {
+          return {
+            status: 429,
+            message: 'Has alcanzado el límite de solicitudes de la API. Por favor, intenta de nuevo en unos minutos.',
+            messageType: 'error',
+            error: error.message
+          }
+        }
+        
+        return {
+          text: `Lo siento, tuve un problema al generar información sobre ${topic}. Por favor, intenta de nuevo más tarde.`,
+          messageType: 'response',
+          error: error.message
+        }
+      }
+    }
 
-      throw createError({
-        statusCode,
-        message,
+    // Para solicitudes de más ejemplos
+    if (userMessage.toLowerCase().includes('más ejemplos') || 
+        userMessage.toLowerCase().includes('otro ejemplo') || 
+        body.requestType === 'examples') {
+      
+      const temaActual = chatStorage.currentTopics.get(userId)
+      
+      if (!temaActual) {
+        return {
+          text: "Por favor, selecciona primero un tema de estudio para ver ejemplos.",
+          messageType: 'response'
+        }
+      }
+      
+      // Verificar límite de tasa
+      if (!rateLimiter.canMakeRequest(userId)) {
+        const waitTime = rateLimiter.getTimeUntilNextRequest(userId);
+        return {
+          status: 429,
+          message: `Has alcanzado el límite de solicitudes. Por favor espera ${Math.ceil(waitTime / 1000)} segundos.`,
+          waitTime,
+          messageType: 'error'
+        }
+      }
+      
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName })
+        const examples = await generateAdditionalExamples(model, temaActual)
+        
+        // Guardar mensaje en el almacenamiento
+        const chatMessages = chatStorage.messages.get(userId) || []
+        chatMessages.push({
+          role: 'user',
+          content: userMessage,
+          timestamp: new Date()
+        })
+        
+        chatMessages.push({
+          role: 'assistant',
+          content: examples,
+          timestamp: new Date()
+        })
+        
+        chatStorage.messages.set(userId, chatMessages)
+        
+        // Actualizar progreso
+        const topicsProgressMap = chatStorage.topicsProgress.get(userId) || new Map()
+        const topicData = topicsProgressMap.get(temaActual) || { progress: 0, completed: false }
+        topicData.progress = Math.min(100, topicData.progress + 5)
+        topicsProgressMap.set(temaActual, topicData)
+        
+        // Procesar ejemplos para mejor visualización
+        const ejemplos: Ejemplo[] = [];
+        const ejemploRegex = /# Ejemplo \d+: (.*?)(?=\n## Problema|\n$)/g;
+        let match;
+        let index = 0;
+        
+        while ((match = ejemploRegex.exec(examples)) !== null) {
+          const titulo = match[1];
+          const inicio = match.index + match[0].length;
+          
+          // Buscar el siguiente ejemplo o el final del texto
+          const siguienteMatch = examples.indexOf('# Ejemplo', inicio);
+          const fin = siguienteMatch > -1 ? siguienteMatch : examples.length;
+          
+          const contenidoEjemplo = examples.substring(inicio, fin);
+          
+          // Extraer problema
+          const problemaMatch = contenidoEjemplo.match(/## Problema\n([\s\S]*?)(?=\n## Solución|\n$)/);
+          const problema = problemaMatch ? problemaMatch[1].trim() : '';
+          
+          // Extraer solución
+          const solucionMatch = contenidoEjemplo.match(/## Solución Paso a Paso\n([\s\S]*?)(?=\n## Conclusión|\n$)/);
+          const solucion = solucionMatch ? solucionMatch[1].trim() : '';
+          
+          // Extraer conclusión
+          const conclusionMatch = contenidoEjemplo.match(/## Conclusión\n([\s\S]*?)$/);
+          const conclusion = conclusionMatch ? conclusionMatch[1].trim() : '';
+          
+          ejemplos.push({
+            id: index++,
+            titulo,
+            problema,
+            solucion,
+            conclusion
+          });
+        }
+        
+        return {
+          text: examples,
+          messageType: 'examples',
+          currentTopic: temaActual,
+          ejemplosProcesados: ejemplos,
+          rawContent: examples
+        }
+      } catch (error: any) {
+        console.error('Error al generar ejemplos:', error)
+        
+        // Manejar error de límite de tasa
+        if (error.status === 429) {
+          return {
+            status: 429,
+            message: 'Has alcanzado el límite de solicitudes de la API. Por favor, intenta de nuevo en unos minutos.',
+            messageType: 'error',
+            error: error.message
+          }
+        }
+        
+        return {
+          text: "Lo siento, hubo un problema al generar los ejemplos. Por favor, intenta de nuevo.",
+          messageType: 'error'
+        }
+      }
+    }
+
+    // Para respuestas a un quiz (A, B, C, D)
+    if (/^[A-D]$/.test(userMessage)) {
+      // Obtener el último quiz guardado
+      const quizKey = `${userId}_lastQuiz`
+      const lastQuiz = chatStorage.quizzes.get(quizKey)
+      
+      if (!lastQuiz) {
+        return {
+          text: "No hay ninguna pregunta activa para responder. ¿Quieres intentar un nuevo quiz?",
+          messageType: 'response'
+        }
+      }
+      
+      const isCorrect = userMessage === lastQuiz.correctAnswer
+      const xpGanado = isCorrect ? 20 : 5
+      
+      // Actualizar XP del estudiante
+      await prisma.estudiante.update({
+        where: { id: userId },
+        data: { xp: { increment: xpGanado } }
       })
-    } else {
-      throw createError({
-        statusCode: 500,
-        message: "Error desconocido al procesar tu solicitud",
+      
+      // Actualizar progreso del tema si la respuesta es correcta
+      if (isCorrect) {
+        const temaActual = chatStorage.currentTopics.get(userId)
+        if (temaActual) {
+          const topicsProgressMap = chatStorage.topicsProgress.get(userId) || new Map()
+          const topicData = topicsProgressMap.get(temaActual) || { progress: 0, completed: false }
+          topicData.progress = Math.min(100, topicData.progress + 20)
+          topicData.completed = topicData.progress >= 100
+          topicsProgressMap.set(temaActual, topicData)
+        }
+      }
+      
+      // Guardar la respuesta del usuario
+      const chatMessages = chatStorage.messages.get(userId) || []
+      chatMessages.push({
+        role: 'user',
+        content: userMessage,
+        timestamp: new Date()
       })
+      
+      // Guardar la respuesta del asistente
+      chatMessages.push({
+        role: 'assistant',
+        content: isCorrect 
+          ? `Respuesta correcta: ${lastQuiz.correctAnswer}. ${lastQuiz.explanation}`
+          : `Respuesta incorrecta. La respuesta correcta es ${lastQuiz.correctAnswer}. ${lastQuiz.explanation}`,
+        timestamp: new Date()
+      })
+      
+      chatStorage.messages.set(userId, chatMessages)
+      
+      // Obtener XP actualizado
+      const estudianteActualizado = await prisma.estudiante.findUnique({
+        where: { id: userId }
+      })
+      
+      return {
+        text: isCorrect 
+          ? "¡Excelente trabajo! Tu respuesta es correcta."
+          : `Esa no es la respuesta correcta. La respuesta correcta es ${lastQuiz.correctAnswer}.`,
+        messageType: 'quiz_response',
+        answerFeedback: {
+          isCorrect: isCorrect,
+          selectedAnswer: userMessage,
+          correctAnswer: lastQuiz.correctAnswer,
+          feedback: lastQuiz.explanation
+        },
+        xp: estudianteActualizado?.xp || estudiante.xp
+      }
+    }
+
+    // Para solicitudes de video
+    if (userMessage.toLowerCase().includes('video') || 
+        userMessage.toLowerCase().includes('multimedia') || 
+        userMessage.toLowerCase().includes('ver') ||
+        body.requestType === 'video') {
+      
+      const temaActual = chatStorage.currentTopics.get(userId)
+      
+      if (!temaActual) {
+        return {
+          text: "¿Sobre qué tema te gustaría ver un video? Por favor, selecciona primero un tema de estudio.",
+          messageType: 'response'
+        }
+      }
+      
+      // Verificar límite de tasa
+      if (!rateLimiter.canMakeRequest(userId)) {
+        const waitTime = rateLimiter.getTimeUntilNextRequest(userId);
+        return {
+          status: 429,
+          message: `Has alcanzado el límite de solicitudes. Por favor espera ${Math.ceil(waitTime / 1000)} segundos.`,
+          waitTime,
+          messageType: 'error'
+        }
+      }
+      
+      // Buscar videos relacionados con el tema usando la API de YouTube
+      try {
+        const videoData = await buscarVideoYouTube(temaActual)
+        
+        // Guardar mensaje en el almacenamiento
+        const chatMessages = chatStorage.messages.get(userId) || []
+        chatMessages.push({
+          role: 'user',
+          content: userMessage,
+          timestamp: new Date()
+        })
+        
+        chatMessages.push({
+          role: 'assistant',
+          content: `Aquí tienes un video sobre ${temaActual}: ${videoData.title} (https://www.youtube.com/watch?v=${videoData.videoId})`,
+          timestamp: new Date()
+        })
+        
+        chatStorage.messages.set(userId, chatMessages)
+        
+        // Actualizar progreso
+        const topicsProgressMap = chatStorage.topicsProgress.get(userId) || new Map()
+        const topicData = topicsProgressMap.get(temaActual) || { progress: 0, completed: false }
+        topicData.progress = Math.min(100, topicData.progress + 5)
+        topicsProgressMap.set(temaActual, topicData)
+        
+        return {
+          text: `Aquí tienes un video educativo sobre ${temaActual}:`,
+          messageType: 'video',
+          videoData: videoData
+        }
+      } catch (error: any) {
+        console.error('Error al buscar videos de YouTube:', error)
+        return {
+          text: `Lo siento, tuve un problema al buscar videos sobre ${temaActual}. Por favor, intenta de nuevo más tarde.`,
+          messageType: 'response',
+          error: error.message
+        }
+      }
+    }
+
+    // Para solicitudes de evaluación o quiz
+    if (userMessage.toLowerCase().includes('quiz') || 
+        userMessage.toLowerCase().includes('pregunta') || 
+        userMessage.toLowerCase().includes('evalua') || 
+        userMessage.toLowerCase().includes('test') ||
+        body.requestType === 'quiz') {
+      
+      const temaActual = chatStorage.currentTopics.get(userId)
+      
+      if (!temaActual) {
+        return {
+          text: "Para generar preguntas de evaluación, primero necesito saber sobre qué tema quieres practicar. Por favor, selecciona un tema de estudio.",
+          messageType: 'response'
+        }
+      }
+      
+      // Verificar límite de tasa
+      if (!rateLimiter.canMakeRequest(userId)) {
+        const waitTime = rateLimiter.getTimeUntilNextRequest(userId);
+        return {
+          status: 429,
+          message: `Has alcanzado el límite de solicitudes. Por favor espera ${Math.ceil(waitTime / 1000)} segundos.`,
+          waitTime,
+          messageType: 'error'
+        }
+      }
+      
+      // Generar quiz con Gemini
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName })
+        const quizData = await generateQuiz(model, temaActual)
+        
+        // Guardar el quiz actual en el almacenamiento para verificar la respuesta después
+        const quizKey = `${userId}_lastQuiz`
+        chatStorage.quizzes.set(quizKey, {
+          ...quizData,
+          timestamp: new Date()
+        })
+        
+        // Guardar mensajes en el almacenamiento
+        const chatMessages = chatStorage.messages.get(userId) || []
+        chatMessages.push({
+          role: 'user',
+          content: userMessage,
+          timestamp: new Date()
+        })
+        
+        // No guardamos la respuesta correcta ni la explicación en el mensaje visible
+        chatMessages.push({
+          role: 'assistant',
+          content: `Pregunta: ${quizData.question}\n\nOpciones:\nA) ${quizData.options[0]}\nB) ${quizData.options[1]}\nC) ${quizData.options[2]}\nD) ${quizData.options[3]}`,
+          timestamp: new Date()
+        })
+        
+        chatStorage.messages.set(userId, chatMessages)
+        
+        return {
+          text: "Aquí tienes una pregunta para evaluar tu conocimiento:",
+          messageType: 'quiz',
+          quiz: {
+            question: quizData.question,
+            options: quizData.options
+            // No enviamos la respuesta correcta ni la explicación aquí
+          }
+        }
+      } catch (error: any) {
+        console.error('Error al generar quiz con Gemini:', error)
+        
+        // Manejar error de límite de tasa
+        if (error.status === 429) {
+          return {
+            status: 429,
+            message: 'Has alcanzado el límite de solicitudes de la API. Por favor, intenta de nuevo en unos minutos.',
+            messageType: 'error',
+            error: error.message
+          }
+        }
+        
+        return {
+          text: `Lo siento, tuve un problema al generar preguntas sobre ${temaActual}. Por favor, intenta de nuevo más tarde.`,
+          messageType: 'response',
+          error: error.message
+        }
+      }
+    }
+
+    // Para cualquier otro mensaje, usar Gemini para generar respuesta
+    try {
+      // Verificar límite de tasa
+      if (!rateLimiter.canMakeRequest(userId)) {
+        const waitTime = rateLimiter.getTimeUntilNextRequest(userId);
+        return {
+          status: 429,
+          message: `Has alcanzado el límite de solicitudes. Por favor espera ${Math.ceil(waitTime / 1000)} segundos.`,
+          waitTime,
+          messageType: 'error'
+        }
+      }
+      
+      const model = genAI.getGenerativeModel({ model: modelName })
+      
+      // Construir contexto para el modelo
+      const temaActual = chatStorage.currentTopics.get(userId)
+      const nivelEstudiante = Math.floor(estudiante.xp / 100) + 1 // Calcular nivel basado en XP
+      
+      const systemPrompt = `
+        Eres un tutor educativo especializado en ayudar a estudiantes.
+        
+        Información del estudiante:
+        - Nombre: ${estudiante.nombre}
+        - Nivel: ${nivelEstudiante}
+        ${temaActual ? `- Tema actual de estudio: ${temaActual}` : ''}
+        
+        Tu objetivo es:
+        1. Proporcionar explicaciones claras y concisas
+        2. Adaptar tus respuestas al nivel del estudiante
+        3. Fomentar el pensamiento crítico
+        4. Ser amigable y motivador
+        
+        Si el estudiante pregunta sobre un tema específico, proporciona información precisa y ejemplos.
+        Si pide ejercicios, genera problemas adecuados a su nivel.
+        Si necesita ayuda con un concepto, explícalo de manera sencilla.
+        
+        Responde de manera conversacional y natural, sin usar HTML ni estilos.
+        Estructura tus respuestas con secciones claras y ejemplos paso a paso.
+        
+        Usa formato markdown para estructurar tu respuesta:
+        - Usa ## para títulos de secciones
+        - Usa listas numeradas para pasos
+        - Usa **negrita** para términos importantes
+        - Usa > para destacar información relevante
+      `
+      
+      // CORREGIDO: Crear chat asegurando que el primer mensaje sea del usuario
+      // Si no hay historial, crear uno con un mensaje inicial del usuario
+      if (formattedHistory.length === 0) {
+        formattedHistory = [
+          {
+            role: 'user',
+            parts: [{ text: userMessage }]
+          }
+        ]
+      } else {
+        // Asegurarse de que el mensaje actual del usuario esté en el historial
+        formattedHistory.push({
+          role: 'user',
+          parts: [{ text: userMessage }]
+        })
+      }
+      
+      // Crear chat con el historial formateado
+      const chat = model.startChat({
+        history: formattedHistory.slice(0, -1), // Excluir el último mensaje (que es el actual)
+        generationConfig: {
+          maxOutputTokens: maxOutputTokens,
+        },
+      })
+      
+      const result = await chat.sendMessage(systemPrompt + "\n\nMensaje del estudiante: " + userMessage)
+      const responseText = result.response.text()
+      
+      // Guardar mensajes en el almacenamiento
+      const chatMessages = chatStorage.messages.get(userId) || []
+      chatMessages.push({
+        role: 'user',
+        content: userMessage,
+        timestamp: new Date()
+      })
+      
+      chatMessages.push({
+        role: 'assistant',
+        content: responseText,
+        timestamp: new Date()
+      })
+      
+      chatStorage.messages.set(userId, chatMessages)
+      
+      // Actualizar XP del estudiante por interacción
+      await prisma.estudiante.update({
+        where: { id: userId },
+        data: { xp: { increment: 2 } }
+      })
+      
+      // Obtener datos actualizados
+      const estudianteActualizado = await prisma.estudiante.findUnique({
+        where: { id: userId }
+      })
+      
+      return {
+        text: responseText,
+        messageType: 'response',
+        xp: estudianteActualizado?.xp || estudiante.xp
+      }
+    } catch (error: any) {
+      console.error('Error al generar respuesta con Gemini:', error)
+      
+      // Manejar error de límite de tasa
+      if (error.status === 429) {
+        return {
+          status: 429,
+          message: 'Has alcanzado el límite de solicitudes de la API. Por favor, intenta de nuevo en unos minutos.',
+          messageType: 'error',
+          error: error.message
+        }
+      }
+      
+      return {
+        text: 'Lo siento, tuve un problema al procesar tu mensaje. Por favor, intenta de nuevo más tarde.',
+        messageType: 'response',
+        error: error.message
+      }
+    }
+
+  } catch (error: any) {
+    console.error('Error en chat.post.ts:', error)
+    return { 
+      status: 500, 
+      message: 'Error interno del servidor',
+      error: error.message 
     }
   }
 })

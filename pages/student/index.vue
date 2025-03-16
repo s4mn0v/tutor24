@@ -121,8 +121,8 @@
               <div v-if="geminiLoading" class="flex justify-center items-center h-20">
                 <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
               </div>
-              <div v-else-if="geminiSummary" class="text-zinc-900 dark:text-gray-300 text-lg space-y-4">
-                <div class="prose max-w-none whitespace-pre-line text-zinc-900 dark:text-gray-300">
+              <div v-else-if="geminiSummary" class="text-zinc-600 dark:text-gray-300 text-lg space-y-4">
+                <div class="prose prose-invert max-w-none whitespace-pre-line">
                   {{ geminiSummary }}
                 </div>
               </div>
@@ -255,7 +255,7 @@ async function fetchLatestNews() {
     if (data.articles?.length > 0) {
       // Limitar explícitamente a 3 noticias
       const limitedArticles = data.articles.slice(0, 3);
-
+      
       // Usar la descripción directamente en lugar de generar con Gemini
       articles.value = limitedArticles.map((article: any, index: number) => ({
         id: index + 1,
@@ -269,7 +269,7 @@ async function fetchLatestNews() {
         description: article.description,
         content: article.content
       }));
-
+      
       // Guardar en caché
       const now = new Date().getTime();
       localStorage.setItem('cachedNews', JSON.stringify(articles.value));
@@ -331,12 +331,12 @@ async function showArticleDetails(article: Article) {
 
 async function getGeminiSummary(article: Article) {
   geminiLoading.value = true;
-
+  
   try {
     // Verificar si ya existe un resumen en caché para este artículo
     const cacheKey = `gemini_summary_${article.id}`;
     const cachedSummary = localStorage.getItem(cacheKey);
-
+    
     if (cachedSummary) {
       geminiSummary.value = cachedSummary;
     } else {
@@ -373,7 +373,7 @@ async function generateDetailedSummary(article: Article): Promise<string> {
   let retries = 0;
   const maxRetries = 3;
   let delay = 1000; // 1 segundo inicial
-
+  
   while (retries < maxRetries) {
     try {
       const response = await fetch('/api/gemini', {
@@ -383,7 +383,7 @@ async function generateDetailedSummary(article: Article): Promise<string> {
         },
         body: JSON.stringify({ prompt }),
       });
-
+      
       if (response.status === 429 && retries < maxRetries - 1) {
         console.log(`Límite de cuota alcanzado. Reintentando en ${delay}ms...`);
         await wait(delay);
@@ -391,26 +391,26 @@ async function generateDetailedSummary(article: Article): Promise<string> {
         delay *= 2; // Espera exponencial
         continue;
       }
-
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
+      
       const text = await response.text();
       return text.trim();
     } catch (error) {
       console.error("Error al generar resumen con Gemini:", error);
       retries++;
-
+      
       if (retries >= maxRetries) {
         throw new Error("No se pudo generar el resumen. Por favor, intenta de nuevo más tarde.");
       }
-
+      
       await wait(delay);
       delay *= 2; // Espera exponencial
     }
   }
-
+  
   throw new Error("No se pudo generar el resumen después de varios intentos.");
 }
 
@@ -421,7 +421,7 @@ async function askGemini() {
   let retries = 0;
   const maxRetries = 3;
   let delay = 1000; // 1 segundo inicial
-
+  
   while (retries < maxRetries) {
     try {
       const prompt = `
@@ -448,7 +448,7 @@ async function askGemini() {
         },
         body: JSON.stringify({ prompt }),
       });
-
+      
       if (response.status === 429 && retries < maxRetries - 1) {
         console.log(`Límite de cuota alcanzado. Reintentando en ${delay}ms...`);
         await wait(delay);
@@ -456,30 +456,30 @@ async function askGemini() {
         delay *= 2; // Espera exponencial
         continue;
       }
-
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
+      
       geminiResponse.value = await response.text();
       geminiInteractions.value++;
       userMessage.value = '';
       break; // Salir del bucle si la solicitud fue exitosa
-
+      
     } catch (error) {
       console.error('Error al consultar a Gemini:', error);
       retries++;
-
+      
       if (retries >= maxRetries) {
         geminiResponse.value = "Error al procesar la pregunta. Por favor, intenta de nuevo más tarde.";
         break;
       }
-
+      
       await wait(delay);
       delay *= 2; // Espera exponencial
     }
   }
-
+  
   geminiLoading.value = false;
 }
 

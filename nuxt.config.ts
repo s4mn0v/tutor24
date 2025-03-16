@@ -1,4 +1,3 @@
-import { theme } from "#tailwind-config";
 export default defineNuxtConfig({
   compatibilityDate: "2024-11-01",
   devtools: { enabled: true },
@@ -47,9 +46,8 @@ export default defineNuxtConfig({
     jwtSecret: process.env.JWT_SECRET,
     geminiApiKey: process.env.GEMINI_API_KEY,
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || "/api",
       supabaseUrl: process.env.SUPABASE_URL,
-      supabaseKey: process.env.SUPABASE_KEY
+      supabaseKey: process.env.SUPABASE_KEY,
     },
   },
   app: {
@@ -67,30 +65,37 @@ export default defineNuxtConfig({
     preference: "system",
     fallback: "light",
   },
-  // Optimizaciones de vite
   vite: {
+    resolve: {
+      alias: {
+        ".prisma/client/index-browser":
+          "./node_modules/.prisma/client/index-browser.js",
+      },
+    },
     build: {
       cssMinify: "esbuild",
       minify: "terser",
       terserOptions: {
-        compress: {
-          drop_console: process.env.NODE_ENV === "production",
-          drop_debugger: process.env.NODE_ENV === "production",
-        },
         format: {
           comments: false, // Eliminar todos los comentarios
+        },
+      },
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ["vue", "pinia", "supabase"],
+            prisma: ["@prisma/client"],
+          },
         },
       },
     },
     optimizeDeps: {
       include: ["vue", "vue-router", "@google/generative-ai", "jwt-decode"],
     },
-    // Layout no jode con esto
     css: {
       preprocessorMaxWorkers: true,
     },
   },
-  // Configurar la carga perezosa de imágenes
   experimental: {
     asyncEntry: true, // Habilitar carga async
     componentIslands: true, // Islands architecture
@@ -110,7 +115,7 @@ export default defineNuxtConfig({
     moduleSideEffects: [], // Mejorar tree-shaking
     minify: true,
     routeRules: {
-      "/api/**": {
+      "/api/": {
         cors: true,
         headers: {
           "Access-Control-Allow-Methods": "GET,HEAD,PUT,PATCH,POST,DELETE",
@@ -119,16 +124,13 @@ export default defineNuxtConfig({
           "Access-Control-Allow-Headers": "*",
         },
       },
-      // Student
       "/api/news": { swr: 1800 },
     },
   },
-  // Añadir configuración de TypeScript
   typescript: {
     strict: true,
     typeCheck: true,
   },
-  // Configuración adicional para Gemini
   build: {
     transpile: ["@google/generative-ai", "cookie"],
   },
